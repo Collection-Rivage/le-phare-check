@@ -61,6 +61,7 @@
                     <tr>
                         <th>Date</th>
                         <th>Hébergement</th>
+                        <th>Type</th>
                         <th>Technicien</th>
                         <th>Statut</th>
                     </tr>
@@ -69,13 +70,14 @@
                     {% for check in derniers_checks %}
                     <tr>
                         <td>{{ check.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
-                        <td>{{ check.hebergement.nom }}</td>
+                        <td>{{ check.hebergement.emplacement }}</td>
+                        <td>{{ check.hebergement.type_hebergement.nom }}</td>
                         <td>{{ check.technicien.username }}</td>
                         <td>
                             {% if check.probleme_critique %}
                             <span class="badge bg-danger">Problème critique</span>
-                           {% elif not (check.electricite and check.plomberie and check.chauffage and check.proprete and check.equipements) %}
-<span class="badge bg-warning">Alerte</span>
+                            {% elif not (check.electricite and check.plomberie and check.chauffage and check.proprete and check.equipements) %}
+                            <span class="badge bg-warning">Alerte</span>
                             {% else %}
                             <span class="badge bg-success">OK</span>
                             {% endif %}
