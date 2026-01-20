@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Tableau de bord - Le Phare Check{% endblock %}
+
+{% block content %}
+<h2><i class="bi bi-speedometer2"></i> Tableau de bord</h2>
+
+<!-- Statistiques -->
+<div class="row mt-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title">Total</h5>
+                <h2 class="text-primary">{{ total }}</h2>
+                <p class="text-muted">Hébergements</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title">OK</h5>
+                <h2 class="text-success">{{ ok }}</h2>
+                <p class="text-muted">Aucun problème</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title">Alerte</h5>
+                <h2 class="text-warning">{{ alerte }}</h2>
+                <p class="text-muted">À surveiller</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title">Problème</h5>
+                <h2 class="text-danger">{{ probleme }}</h2>
+                <p class="text-muted">Intervention requise</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Derniers checks -->
+<div class="card mt-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-clock-history"></i> Derniers checks</h5>
+    </div>
+    <div class="card-body">
+        {% if derniers_checks %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Hébergement</th>
+                        <th>Technicien</th>
+                        <th>Statut</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for check in derniers_checks %}
+                    <tr>
+                        <td>{{ check.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td>{{ check.hebergement.nom }}</td>
+                        <td>{{ check.technicien.username }}</td>
+                        <td>
+                            {% if check.probleme_critique %}
+                            <span class="badge bg-danger">Problème critique</span>
+                            {% elif not all([check.electricite, check.plomberie, check.chauffage, check.proprete, check.equipements]) %}
+                            <span class="badge bg-warning">Alerte</span>
+                            {% else %}
+                            <span class="badge bg-success">OK</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted text-center">Aucun check effectué pour le moment</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
