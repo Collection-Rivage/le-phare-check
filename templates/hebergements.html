@@ -20,11 +20,12 @@
         <div class="col-md-4 mb-3">
             <div class="card h-100 {% if heb.statut == 'probleme' %}border-danger{% elif heb.statut == 'alerte' %}border-warning{% else %}border-success{% endif %}">
                 <div class="card-body">
-                    <h5 class="card-title">{{ heb.nom }}</h5>
+                    <h5 class="card-title">{{ heb.emplacement }}</h5>
                     <p class="card-text">
-                        <strong>Type :</strong> {{ heb.type }}<br>
-                        <strong>Zone :</strong> {{ heb.zone or 'N/A' }}<br>
-                        <strong>Capacité :</strong> {{ heb.capacite or 'N/A' }}
+                        <strong>Type :</strong> {{ heb.type_hebergement.nom }}<br>
+                        <strong>N° Châssis :</strong> {{ heb.numero_chassis or 'N/A' }}<br>
+                        <strong>Capacité :</strong> {{ heb.nb_personnes or 'N/A' }} pers.<br>
+                        <strong>Compteur eau :</strong> {{ heb.compteur_eau.replace('_', ' ').title() if heb.compteur_eau else 'N/A' }}
                     </p>
                     
                     <div class="mb-2">
@@ -40,9 +41,76 @@
                     <a href="{{ url_for('check', hebergement_id=heb.id) }}" class="btn btn-primary btn-sm">
                         <i class="bi bi-clipboard-check"></i> Faire un check
                     </a>
+                    
+                    {% if current_user.role == 'admin' %}
+                    <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#editModal{{ heb.id }}">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <a href="{{ url_for('delete_hebergement', id=heb.id) }}" class="btn btn-danger btn-sm" onclick="return confirm('Supprimer cet hébergement ?')">
+                        <i class="bi bi-trash"></i>
+                    </a>
+                    {% endif %}
                 </div>
             </div>
         </div>
+        
+        <!-- Modal d'édition -->
+        {% if current_user.role == 'admin' %}
+        <div class="modal fade" id="editModal{{ heb.id }}" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Modifier l'hébergement</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <form method="POST" action="{{ url_for('edit_hebergement', id=heb.id) }}">
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label for="emplacement{{ heb.id }}" class="form-label">Emplacement *</label>
+                                <input type="text" class="form-control" id="emplacement{{ heb.id }}" name="emplacement" value="{{ heb.emplacement }}" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="type_id{{ heb.id }}" class="form-label">Type *</label>
+                                <select class="form-select" id="type_id{{ heb.id }}" name="type_id" required>
+                                    {% for type in types %}
+                                    <option value="{{ type.id }}" {% if type.id == heb.type_id %}selected{% endif %}>{{ type.nom }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="numero_chassis{{ heb.id }}" class="form-label">N° de châssis</label>
+                                <input type="text" class="form-control" id="numero_chassis{{ heb.id }}" name="numero_chassis" value="{{ heb.numero_chassis or '' }}">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="nb_personnes{{ heb.id }}" class="form-label">Nombre de personnes</label>
+                                <input type="number" class="form-control" id="nb_personnes{{ heb.id }}" name="nb_personnes" value="{{ heb.nb_personnes or '' }}">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="compteur_eau{{ heb.id }}" class="form-label">Emplacement compteur d'eau</label>
+                                <select class="form-select" id="compteur_eau{{ heb.id }}" name="compteur_eau">
+                                    <option value="">-- Sélectionner --</option>
+                                    <option value="devant_droite" {% if heb.compteur_eau == 'devant_droite' %}selected{% endif %}>Devant Droite</option>
+                                    <option value="devant_gauche" {% if heb.compteur_eau == 'devant_gauche' %}selected{% endif %}>Devant Gauche</option>
+                                    <option value="devant_milieu" {% if heb.compteur_eau == 'devant_milieu' %}selected{% endif %}>Devant Milieu</option>
+                                    <option value="arriere_droite" {% if heb.compteur_eau == 'arriere_droite' %}selected{% endif %}>Arrière Droite</option>
+                                    <option value="arriere_gauche" {% if heb.compteur_eau == 'arriere_gauche' %}selected{% endif %}>Arrière Gauche</option>
+                                    <option value="arriere_milieu" {% if heb.compteur_eau == 'arriere_milieu' %}selected{% endif %}>Arrière Milieu</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                            <button type="submit" class="btn btn-primary">Enregistrer</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endif %}
         {% endfor %}
     {% else %}
         <div class="col-12">
@@ -65,27 +133,41 @@
             <form method="POST" action="{{ url_for('add_hebergement') }}">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="nom" class="form-label">Nom *</label>
-                        <input type="text" class="form-control" id="nom" name="nom" required>
+                        <label for="emplacement" class="form-label">Emplacement *</label>
+                        <input type="text" class="form-control" id="emplacement" name="emplacement" placeholder="Ex: A12, B5" required>
                     </div>
                     
                     <div class="mb-3">
-                        <label for="type" class="form-label">Type *</label>
-                        <select class="form-select" id="type" name="type" required>
+                        <label for="type_id" class="form-label">Type *</label>
+                        <select class="form-select" id="type_id" name="type_id" required>
                             <option value="">-- Sélectionner --</option>
-                            <option value="Cabane">Cabane</option>
-                            <option value="Mobil-home Staff">Mobil-home Staff</option>
+                            {% for type in types %}
+                            <option value="{{ type.id }}">{{ type.nom }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                     
                     <div class="mb-3">
-                        <label for="zone" class="form-label">Zone</label>
-                        <input type="text" class="form-control" id="zone" name="zone">
+                        <label for="numero_chassis" class="form-label">N° de châssis</label>
+                        <input type="text" class="form-control" id="numero_chassis" name="numero_chassis">
                     </div>
                     
                     <div class="mb-3">
-                        <label for="capacite" class="form-label">Capacité</label>
-                        <input type="number" class="form-control" id="capacite" name="capacite">
+                        <label for="nb_personnes" class="form-label">Nombre de personnes</label>
+                        <input type="number" class="form-control" id="nb_personnes" name="nb_personnes" min="1">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="compteur_eau" class="form-label">Emplacement compteur d'eau (hivernage)</label>
+                        <select class="form-select" id="compteur_eau" name="compteur_eau">
+                            <option value="">-- Sélectionner --</option>
+                            <option value="devant_droite">Devant Droite</option>
+                            <option value="devant_gauche">Devant Gauche</option>
+                            <option value="devant_milieu">Devant Milieu</option>
+                            <option value="arriere_droite">Arrière Droite</option>
+                            <option value="arriere_gauche">Arrière Gauche</option>
+                            <option value="arriere_milieu">Arrière Milieu</option>
+                        </select>
                     </div>
                 </div>
                 <div class="modal-footer">
