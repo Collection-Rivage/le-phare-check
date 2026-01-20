@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Historique - Le Phare Check{% endblock %}
+
+{% block content %}
+<h2><i class="bi bi-clock-history"></i> Historique des checks</h2>
+
+<div class="card mt-4">
+    <div class="card-body">
+        {% if checks %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Hébergement</th>
+                        <th>Type</th>
+                        <th>Technicien</th>
+                        <th>Statut</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for check in checks %}
+                    <tr>
+                        <td>{{ check.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td>{{ check.hebergement.nom }}</td>
+                        <td>{{ check.hebergement.type }}</td>
+                        <td>{{ check.technicien.username }}</td>
+                        <td>
+                            {% if check.probleme_critique %}
+                            <span class="badge bg-danger">Problème critique</span>
+                            {% elif not all([check.electricite, check.plomberie, check.chauffage, check.proprete, check.equipements]) %}
+                            <span class="badge bg-warning">Alerte</span>
+                            {% else %}
+                            <span class="badge bg-success">OK</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#detailModal{{ check.id }}">
+                                <i class="bi bi-eye"></i> Détails
+                            </button>
+                        </td>
+                    </tr>
+                    
+                    <!-- Modal détails -->
+                    <div class="modal fade" id="detailModal{{ check.id }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Détails du check</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p><strong>Date :</strong> {{ check.created_at.strftime('%d/%m/%Y à %H:%M') }}</p>
+                                    <p><strong>Hébergement :</strong> {{ check.hebergement.nom }}</p>
+                                    <p><strong>Technicien :</strong> {{ check.technicien.username }}</p>
+                                    
+                                    <hr>
+                                    
+                                    <h6>Checklist :</h6>
+                                    <ul class="list-unstyled">
+                                        <li>{% if check.electricite %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %} Électricité</li>
+                                        <li>{% if check.plomberie %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %} Plomberie</li>
+                                        <li>{% if check.chauffage %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %} Chauffage</li>
+                                        <li>{% if check.proprete %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %} Propreté</li>
+                                        <li>{% if check.equipements %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %} Équipements</li>
+                                    </ul>
+                                    
+                                    {% if check.probleme_critique %}
+                                    <div class="alert alert-danger">
+                                        <i class="bi bi-exclamation-triangle-fill"></i> <strong>Problème critique signalé</strong>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if check.observations %}
+                                    <hr>
+                                    <h6>Observations :</h6>
+                                    <p>{{ check.observations }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted text-center">Aucun check effectué pour le moment</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
