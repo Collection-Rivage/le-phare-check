@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from config import Config
-from models import db, User, Hebergement, Check
+from models import db, User, Hebergement, Check, TypeHebergement
 from mail import mail, send_alert_email
 import os
 
@@ -24,13 +24,24 @@ def load_user(user_id):
 with app.app_context():
     db.create_all()
     
-    # Créer un utilisateur admin par défaut si aucun utilisateur existe
+    # Créer un utilisateur admin par défaut
     if User.query.count() == 0:
         admin = User(username='admin', email='admin@lephare.com', role='admin')
-        admin.set_password('admin123')  # À changer en production !
+        admin.set_password('admin123')
         db.session.add(admin)
         db.session.commit()
         print("✅ Utilisateur admin créé : admin / admin123")
+    
+    # Créer des types par défaut
+    if TypeHebergement.query.count() == 0:
+        types_defaut = [
+            TypeHebergement(nom='Cabane', description='Cabane sur pilotis'),
+            TypeHebergement(nom='Mobil-home Staff', description='Mobil-home pour le personnel'),
+            TypeHebergement(nom='Mobil-home Standard', description='Mobil-home standard'),
+        ]
+        db.session.add_all(types_defaut)
+        db.session.commit()
+        print("✅ Types d'hébergement créés")
 
 
 # ==================== ROUTES ====================
@@ -94,8 +105,9 @@ def dashboard():
 @login_required
 def hebergements():
     hebergements_list = Hebergement.query.all()
+    types = TypeHebergement.query.all()
     is_online = os.environ.get('RENDER') is not None
-    return render_template('hebergements.html', hebergements=hebergements_list, is_online=is_online)
+    return render_template('hebergements.html', hebergements=hebergements_list, types=types, is_online=is_online)
 
 
 @app.route('/hebergements/add', methods=['POST'])
@@ -105,18 +117,132 @@ def add_hebergement():
         flash('Accès refusé', 'danger')
         return redirect(url_for('hebergements'))
     
-    nom = request.form.get('nom')
-    type_heb = request.form.get('type')
-    zone = request.form.get('zone')
-    capacite = request.form.get('capacite')
+    emplacement = request.form.get('emplacement')
+    type_id = request.form.get('type_id')
+    numero_chassis = request.form.get('numero_chassis')
+    nb_personnes = request.form.get('nb_personnes')
+    compteur_eau = request.form.get('compteur_eau')
     
-    nouvel_heb = Hebergement(nom=nom, type=type_heb, zone=zone, capacite=capacite)
+    nouvel_heb = Hebergement(
+        emplacement=emplacement,
+        type_id=type_id,
+        numero_chassis=numero_chassis,
+        nb_personnes=nb_personnes,
+        compteur_eau=compteur_eau
+    )
     db.session.add(nouvel_heb)
     db.session.commit()
     
-    flash(f'Hébergement "{nom}" ajouté avec succès', 'success')
+    flash(f'Hébergement "{emplacement}" ajouté avec succès', 'success')
     return redirect(url_for('hebergements'))
 
+
+@app.route('/hebergements/edit/<int:id>', methods=['POST'])
+@login_required
+def edit_hebergement(id):
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('hebergements'))
+    
+    heb = Hebergement.query.get_or_404(id)
+    heb.emplacement = request.form.get('emplacement')
+    heb.type_id = request.form.get('type_id')
+    heb.numero_chassis = request.form.get('numero_chassis')
+    heb.nb_personnes = request.form.get('nb_personnes')
+    heb.compteur_eau = request.form.get('compteur_eau')
+    
+    db.session.commit()
+    flash(f'Hébergement "{heb.emplacement}" modifié avec succès', 'success')
+    return redirect(url_for('hebergements'))
+
+
+@app.route('/hebergements/delete/<int:id>')
+@login_required
+def delete_hebergement(id):
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('hebergements'))
+    
+    heb = Hebergement.query.get_or_404(id)
+    emplacement = heb.emplacement
+    db.session.delete(heb)
+    db.session.commit()
+    
+    flash(f'Hébergement "{emplacement}" supprimé', 'warning')
+    return redirect(url_for('hebergements'))
+
+
+# ==================== GESTION DES TYPES ====================
+
+@app.route('/types')
+@login_required
+def types_hebergement():
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    types = TypeHebergement.query.all()
+    is_online = os.environ.get('RENDER') is not None
+    return render_template('types.html', types=types, is_online=is_online)
+
+
+@app.route('/types/add', methods=['POST'])
+@login_required
+def add_type():
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('types_hebergement'))
+    
+    nom = request.form.get('nom')
+    description = request.form.get('description')
+    
+    nouveau_type = TypeHebergement(nom=nom, description=description)
+    db.session.add(nouveau_type)
+    db.session.commit()
+    
+    flash(f'Type "{nom}" ajouté avec succès', 'success')
+    return redirect(url_for('types_hebergement'))
+
+
+@app.route('/types/edit/<int:id>', methods=['POST'])
+@login_required
+def edit_type(id):
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('types_hebergement'))
+    
+    type_heb = TypeHebergement.query.get_or_404(id)
+    type_heb.nom = request.form.get('nom')
+    type_heb.description = request.form.get('description')
+    
+    db.session.commit()
+    flash(f'Type "{type_heb.nom}" modifié avec succès', 'success')
+    return redirect(url_for('types_hebergement'))
+
+
+@app.route('/types/delete/<int:id>')
+@login_required
+def delete_type(id):
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('types_hebergement'))
+    
+    type_heb = TypeHebergement.query.get_or_404(id)
+    
+    # Vérifier qu'aucun hébergement n'utilise ce type
+    if len(type_heb.hebergements) > 0:
+        flash(f'Impossible de supprimer : {len(type_heb.hebergements)} hébergement(s) utilisent ce type', 'danger')
+        return redirect(url_for('types_hebergement'))
+    
+    nom = type_heb.nom
+    db.session.delete(type_heb)
+    db.session.commit()
+    
+    flash(f'Type "{nom}" supprimé', 'warning')
+    return redirect(url_for('types_hebergement'))
+
+
+# ==================== CHECKS ====================
 
 @app.route('/check/<int:hebergement_id>', methods=['GET', 'POST'])
 @login_required
@@ -142,16 +268,16 @@ def check(hebergement_id):
         # Mise à jour du statut de l'hébergement
         if nouveau_check.probleme_critique:
             hebergement.statut = 'probleme'
-        elif not all([nouveau_check.electricite, nouveau_check.plomberie, 
-                     nouveau_check.chauffage, nouveau_check.proprete, 
-                     nouveau_check.equipements]):
+        elif not (nouveau_check.electricite and nouveau_check.plomberie and 
+                 nouveau_check.chauffage and nouveau_check.proprete and 
+                 nouveau_check.equipements):
             hebergement.statut = 'alerte'
         else:
             hebergement.statut = 'ok'
         
         db.session.commit()
         
-               # Envoi de l'email si problème (désactivé temporairement)
+        # Envoi de l'email si problème (désactivé temporairement)
         # if hebergement.statut != 'ok':
         #     try:
         #         send_alert_email(nouveau_check, hebergement, current_user)
