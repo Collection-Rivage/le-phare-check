@@ -28,22 +28,36 @@ class User(UserMixin, db.Model):
         return f'<User {self.username}>'
 
 
+class TypeHebergement(db.Model):
+    __tablename__ = 'types_hebergement'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    nom = db.Column(db.String(100), unique=True, nullable=False)
+    description = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<TypeHebergement {self.nom}>'
+
+
 class Hebergement(db.Model):
     __tablename__ = 'hebergements'
     
     id = db.Column(db.Integer, primary_key=True)
-    nom = db.Column(db.String(100), nullable=False)
-    type = db.Column(db.String(50), nullable=False)  # Cabane, Mobil-home Staff
-    zone = db.Column(db.String(50))
-    capacite = db.Column(db.Integer)
+    emplacement = db.Column(db.String(50), nullable=False)  # Ex: A12, B5
+    type_id = db.Column(db.Integer, db.ForeignKey('types_hebergement.id'), nullable=False)
+    numero_chassis = db.Column(db.String(100))
+    nb_personnes = db.Column(db.Integer)
+    compteur_eau = db.Column(db.String(50))  # devant_droite, devant_gauche, etc.
     statut = db.Column(db.String(20), default='ok')  # ok, alerte, probleme
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relations
     checks = db.relationship('Check', backref='hebergement', lazy=True)
+    type_hebergement = db.relationship('TypeHebergement', backref='hebergements')
     
     def __repr__(self):
-        return f'<Hebergement {self.nom}>'
+        return f'<Hebergement {self.emplacement}>'
 
 
 class Check(db.Model):
@@ -67,4 +81,4 @@ class Check(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     def __repr__(self):
-        return f'<Check {self.id} - {self.hebergement.nom}>'
+        return f'<Check {self.id} - {self.hebergement.emplacement}>'
