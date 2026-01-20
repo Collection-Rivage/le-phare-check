@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Hébergements - Le Phare Check{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-house-door"></i> Hébergements</h2>
+    
+    {% if current_user.role == 'admin' %}
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
+        <i class="bi bi-plus-circle"></i> Ajouter un hébergement
+    </button>
+    {% endif %}
+</div>
+
+<!-- Liste des hébergements -->
+<div class="row">
+    {% if hebergements %}
+        {% for heb in hebergements %}
+        <div class="col-md-4 mb-3">
+            <div class="card h-100 {% if heb.statut == 'probleme' %}border-danger{% elif heb.statut == 'alerte' %}border-warning{% else %}border-success{% endif %}">
+                <div class="card-body">
+                    <h5 class="card-title">{{ heb.nom }}</h5>
+                    <p class="card-text">
+                        <strong>Type :</strong> {{ heb.type }}<br>
+                        <strong>Zone :</strong> {{ heb.zone or 'N/A' }}<br>
+                        <strong>Capacité :</strong> {{ heb.capacite or 'N/A' }}
+                    </p>
+                    
+                    <div class="mb-2">
+                        {% if heb.statut == 'ok' %}
+                        <span class="badge bg-success">OK</span>
+                        {% elif heb.statut == 'alerte' %}
+                        <span class="badge bg-warning">Alerte</span>
+                        {% else %}
+                        <span class="badge bg-danger">Problème</span>
+                        {% endif %}
+                    </div>
+                    
+                    <a href="{{ url_for('check', hebergement_id=heb.id) }}" class="btn btn-primary btn-sm">
+                        <i class="bi bi-clipboard-check"></i> Faire un check
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="col-12">
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> Aucun hébergement enregistré pour le moment.
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Modal d'ajout (admin uniquement) -->
+{% if current_user.role == 'admin' %}
+<div class="modal fade" id="addModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Ajouter un hébergement</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('add_hebergement') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="nom" class="form-label">Nom *</label>
+                        <input type="text" class="form-control" id="nom" name="nom" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="type" class="form-label">Type *</label>
+                        <select class="form-select" id="type" name="type" required>
+                            <option value="">-- Sélectionner --</option>
+                            <option value="Cabane">Cabane</option>
+                            <option value="Mobil-home Staff">Mobil-home Staff</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="zone" class="form-label">Zone</label>
+                        <input type="text" class="form-control" id="zone" name="zone">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="capacite" class="form-label">Capacité</label>
+                        <input type="number" class="form-control" id="capacite" name="capacite">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Ajouter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
