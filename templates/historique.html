@@ -24,13 +24,14 @@
                     {% for check in checks %}
                     <tr>
                         <td>{{ check.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
-                        <td>{{ check.hebergement.nom }}</td>
-                        <td>{{ check.hebergement.type }}</td>
+                        <td>{{ check.hebergement.emplacement }}</td>
+                        <td>{{ check.hebergement.type_hebergement.nom }}</td>
                         <td>{{ check.technicien.username }}</td>
                         <td>
                             {% if check.probleme_critique %}
                             <span class="badge bg-danger">Problème critique</span>
-                           {% elif not (check.electricite and check.plomberie and check.chauffage and check.proprete and check.equipements) %}
+                            {% elif not (check.electricite and check.plomberie and check.chauffage and check.proprete and check.equipements) %}
+                            <span class="badge bg-warning">Alerte</span>
                             {% else %}
                             <span class="badge bg-success">OK</span>
                             {% endif %}
@@ -52,7 +53,9 @@
                                 </div>
                                 <div class="modal-body">
                                     <p><strong>Date :</strong> {{ check.created_at.strftime('%d/%m/%Y à %H:%M') }}</p>
-                                    <p><strong>Hébergement :</strong> {{ check.hebergement.nom }}</p>
+                                    <p><strong>Hébergement :</strong> {{ check.hebergement.emplacement }}</p>
+                                    <p><strong>Type :</strong> {{ check.hebergement.type_hebergement.nom }}</p>
+                                    <p><strong>N° Châssis :</strong> {{ check.hebergement.numero_chassis or 'N/A' }}</p>
                                     <p><strong>Technicien :</strong> {{ check.technicien.username }}</p>
                                     
                                     <hr>
