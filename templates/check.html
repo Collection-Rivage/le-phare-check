@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Check - {{ hebergement.nom }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">
+                    <i class="bi bi-clipboard-check"></i> Check : {{ hebergement.nom }}
+                </h4>
+                <small>{{ hebergement.type }} - Zone {{ hebergement.zone or 'N/A' }}</small>
+            </div>
+            
+            <div class="card-body">
+                <form method="POST">
+                    <h5 class="mb-3">Checklist technique</h5>
+                    
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="electricite" name="electricite" checked>
+                        <label class="form-check-label" for="electricite">
+                            <i class="bi bi-lightning-charge"></i> Électricité
+                        </label>
+                    </div>
+                    
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="plomberie" name="plomberie" checked>
+                        <label class="form-check-label" for="plomberie">
+                            <i class="bi bi-droplet"></i> Plomberie
+                        </label>
+                    </div>
+                    
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="chauffage" name="chauffage" checked>
+                        <label class="form-check-label" for="chauffage">
+                            <i class="bi bi-thermometer-half"></i> Chauffage
+                        </label>
+                    </div>
+                    
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="proprete" name="proprete" checked>
+                        <label class="form-check-label" for="proprete">
+                            <i class="bi bi-spray-can"></i> Propreté
+                        </label>
+                    </div>
+                    
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="equipements" name="equipements" checked>
+                        <label class="form-check-label" for="equipements">
+                            <i class="bi bi-tools"></i> Équipements
+                        </label>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="mb-3">
+                        <label for="observations" class="form-label">Observations</label>
+                        <textarea class="form-control" id="observations" name="observations" rows="4" placeholder="Notez ici vos observations..."></textarea>
+                    </div>
+                    
+                    <div class="form-check mb-4">
+                        <input class="form-check-input" type="checkbox" id="probleme_critique" name="probleme_critique">
+                        <label class="form-check-label text-danger fw-bold" for="probleme_critique">
+                            <i class="bi bi-exclamation-triangle-fill"></i> Problème critique nécessitant une intervention immédiate
+                        </label>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="bi bi-check-circle"></i> Valider le check
+                        </button>
+                        <a href="{{ url_for('hebergements') }}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Annuler
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
