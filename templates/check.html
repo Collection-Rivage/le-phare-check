@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Check - {{ hebergement.nom }}{% endblock %}
+{% block title %}Check - {{ hebergement.emplacement }}{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -8,9 +8,9 @@
         <div class="card">
             <div class="card-header bg-primary text-white">
                 <h4 class="mb-0">
-                    <i class="bi bi-clipboard-check"></i> Check : {{ hebergement.nom }}
+                    <i class="bi bi-clipboard-check"></i> Check : {{ hebergement.emplacement }}
                 </h4>
-                <small>{{ hebergement.type }} - Zone {{ hebergement.zone or 'N/A' }}</small>
+                <small>{{ hebergement.type_hebergement.nom }} - {{ hebergement.nb_personnes or 'N/A' }} pers. - Châssis: {{ hebergement.numero_chassis or 'N/A' }}</small>
             </div>
             
             <div class="card-body">
@@ -53,6 +53,12 @@
                     </div>
                     
                     <hr>
+                    
+                    {% if hebergement.compteur_eau %}
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> <strong>Compteur d'eau :</strong> {{ hebergement.compteur_eau.replace('_', ' ').title() }}
+                    </div>
+                    {% endif %}
                     
                     <div class="mb-3">
                         <label for="observations" class="form-label">Observations</label>
