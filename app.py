@@ -151,12 +151,12 @@ def check(hebergement_id):
         
         db.session.commit()
         
-        # Envoi de l'email si problème
-        if hebergement.statut != 'ok':
-            try:
-                send_alert_email(nouveau_check, hebergement, current_user)
-            except Exception as e:
-                print(f"Erreur envoi email : {e}")
+               # Envoi de l'email si problème (désactivé temporairement)
+        # if hebergement.statut != 'ok':
+        #     try:
+        #         send_alert_email(nouveau_check, hebergement, current_user)
+        #     except Exception as e:
+        #         print(f"Erreur envoi email : {e}")
         
         flash('Check enregistré avec succès', 'success')
         return redirect(url_for('dashboard'))
