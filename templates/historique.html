@@ -30,8 +30,7 @@
                         <td>
                             {% if check.probleme_critique %}
                             <span class="badge bg-danger">Problème critique</span>
-                            {% elif not all([check.electricite, check.plomberie, check.chauffage, check.proprete, check.equipements]) %}
-                            <span class="badge bg-warning">Alerte</span>
+                           {% elif not (check.electricite and check.plomberie and check.chauffage and check.proprete and check.equipements) %}
                             {% else %}
                             <span class="badge bg-success">OK</span>
                             {% endif %}
