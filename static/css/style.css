@@ -1,0 +1,166 @@
+/* Le Phare Check - Styles personnalisés */
+
+:root {
+    --phare-primary: #0d6efd;
+    --phare-success: #198754;
+    --phare-warning: #ffc107;
+    --phare-danger: #dc3545;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+}
+
+/* Header */
+.navbar-brand {
+    font-weight: bold;
+    font-size: 1.3rem;
+}
+
+/* Cards */
+.card {
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+/* Badges de statut */
+.badge {
+    padding: 0.5em 0.8em;
+    font-size: 0.9em;
+}
+
+/* Formulaires */
+.form-check-input:checked {
+    background-color: var(--phare-success);
+    border-color: var(--phare-success);
+}
+
+.form-check-input:focus {
+    border-color: var(--phare-primary);
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+/* Boutons */
+.btn {
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+/* Tables */
+.table {
+    background-color: white;
+}
+
+.table thead th {
+    background-color: var(--phare-primary);
+    color: white;
+    border: none;
+}
+
+.table-hover tbody tr:hover {
+    background-color: #f1f3f5;
+}
+
+/* Indicateur de connexion */
+.navbar .badge {
+    font-size: 0.85rem;
+    padding: 0.4em 0.8em;
+}
+
+/* Modal */
+.modal-header {
+    background-color: var(--phare-primary);
+    color: white;
+}
+
+.modal-header .btn-close {
+    filter: invert(1);
+}
+
+/* Switch personnalisé */
+.form-check-input {
+    width: 3em;
+    height: 1.5em;
+    cursor: pointer;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.card, .alert {
+    animation: fadeIn 0.3s ease-in;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .navbar-brand {
+        font-size: 1rem;
+    }
+    
+    .card {
+        margin-bottom: 1rem;
+    }
+    
+    .table {
+        font-size: 0.9rem;
+    }
+}
+
+/* Page de connexion */
+.card-body h3 {
+    color: var(--phare-primary);
+}
+
+/* Alertes personnalisées */
+.alert {
+    border-radius: 8px;
+    border-left: 4px solid;
+}
+
+.alert-success {
+    border-left-color: var(--phare-success);
+}
+
+.alert-warning {
+    border-left-color: var(--phare-warning);
+}
+
+.alert-danger {
+    border-left-color: var(--phare-danger);
+}
+
+.alert-info {
+    border-left-color: var(--phare-primary);
+}
+
+/* Icônes */
+.bi {
+    vertical-align: -0.125em;
+}
+
+/* Footer implicite */
+body {
+    padding-bottom: 2rem;
+}
