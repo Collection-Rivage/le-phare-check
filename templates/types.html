@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Types d'hébergement - Le Phare Check{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-tags"></i> Types d'hébergement</h2>
+    
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
+        <i class="bi bi-plus-circle"></i> Ajouter un type
+    </button>
+</div>
+
+<!-- Liste des types -->
+<div class="card">
+    <div class="card-body">
+        {% if types %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Nom</th>
+                        <th>Description</th>
+                        <th>Hébergements</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for type in types %}
+                    <tr>
+                        <td><strong>{{ type.nom }}</strong></td>
+                        <td>{{ type.description or 'Aucune description' }}</td>
+                        <td>
+                            <span class="badge bg-info">{{ type.hebergements|length }} hébergement(s)</span>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editModal{{ type.id }}">
+                                <i class="bi bi-pencil"></i> Modifier
+                            </button>
+                            {% if type.hebergements|length == 0 %}
+                            <a href="{{ url_for('delete_type', id=type.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('Supprimer ce type ?')">
+                                <i class="bi bi-trash"></i> Supprimer
+                            </a>
+                            {% else %}
+                            <button class="btn btn-sm btn-danger" disabled title="Type utilisé par des hébergements">
+                                <i class="bi bi-trash"></i> Supprimer
+                            </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    
+                    <!-- Modal d'édition -->
+                    <div class="modal fade" id="editModal{{ type.id }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Modifier le type</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <form method="POST" action="{{ url_for('edit_type', id=type.id) }}">
+                                    <div class="modal-body">
+                                        <div class="mb-3">
+                                            <label for="nom{{ type.id }}" class="form-label">Nom *</label>
+                                            <input type="text" class="form-control" id="nom{{ type.id }}" name="nom" value="{{ type.nom }}" required>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="description{{ type.id }}" class="form-label">Description</label>
+                                            <textarea class="form-control" id="description{{ type.id }}" name="description" rows="2">{{ type.description or '' }}</textarea>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                                        <button type="submit" class="btn btn-primary">Enregistrer</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted text-center">Aucun type d'hébergement créé.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal d'ajout -->
+<div class="modal fade" id="addModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Ajouter un type</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('add_type') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="nom" class="form-label">Nom *</label>
+                        <input type="text" class="form-control" id="nom" name="nom" placeholder="Ex: Mobil-home Premium" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="2" placeholder="Description optionnelle"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Ajouter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
