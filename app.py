@@ -58,12 +58,9 @@ with app.app_context():
         
         # CABANES (189)
         print("📦 Création des 189 Cabanes...")
-        zones = ['A', 'B', 'C', 'D', 'E', 'F']
         
         for i in range(1, 190):
-            zone = zones[(i - 1) // 32]
-            numero = ((i - 1) % 32) + 1
-            emplacement = f"{zone}{numero}"
+            emplacement = str(i)
             
             cabane = Hebergement(
                 emplacement=emplacement,
