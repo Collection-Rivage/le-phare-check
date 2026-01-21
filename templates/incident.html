@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Signaler un incident - {{ hebergement.emplacement }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h4 class="mb-0"><i class="bi bi-exclamation-triangle-fill"></i> Signaler un problème</h4>
+                <small>{{ hebergement.emplacement }} - {{ hebergement.type_hebergement.nom }}</small>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-4">
+                        <label class="form-label fw-bold fs-5">Type d'incident</label>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="type_incident" id="probleme" value="probleme" checked>
+                                    <label class="form-check-label text-warning fw-bold" for="probleme">
+                                        <i class="bi bi-tools"></i> Problème technique
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="type_incident" id="urgence" value="urgence">
+                                    <label class="form-check-label text-danger fw-bold" for="urgence">
+                                        <i class="bi bi-exclamation-octagon-fill"></i> Intervention urgente
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="description" class="form-label fw-bold">Description *</label>
+                        <textarea class="form-control" id="description" name="description" rows="6" required placeholder="Décrivez précisément le problème..."></textarea>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="assigne_a" class="form-label fw-bold">Assigner à un technicien</label>
+                        <select class="form-select" id="assigne_a" name="assigne_a">
+                            <option value="">-- Non assigné --</option>
+                            {% for tech in techniciens %}
+                            <option value="{{ tech.id }}">{{ tech.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-danger btn-lg">
+                            <i class="bi bi-send-fill"></i> Signaler l'incident
+                        </button>
+                        <a href="{{ url_for('hebergements') }}" class="btn btn-secondary btn-lg">
+                            <i class="bi bi-arrow-left"></i> Annuler
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
