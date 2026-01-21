@@ -38,10 +38,73 @@ with app.app_context():
             TypeHebergement(nom='Cabane', description='Cabane sur pilotis'),
             TypeHebergement(nom='Mobil-home Staff', description='Mobil-home pour le personnel'),
             TypeHebergement(nom='Mobil-home Standard', description='Mobil-home standard'),
+            TypeHebergement(nom='Espace Bien Être', description='Espace détente et bien-être'),
         ]
         db.session.add_all(types_defaut)
         db.session.commit()
         print("✅ Types d'hébergement créés")
+    
+    # Initialiser les hébergements (exécuté UNE SEULE FOIS)
+    if Hebergement.query.count() == 0:
+        print("🏗️  Création des 218 hébergements...")
+        
+        # Récupérer les types
+        type_cabane = TypeHebergement.query.filter_by(nom='Cabane').first()
+        type_mh_staff = TypeHebergement.query.filter_by(nom='Mobil-home Staff').first()
+        type_bien_etre = TypeHebergement.query.filter_by(nom='Espace Bien Être').first()
+        
+        hebergements = []
+        compteurs = ['devant_droite', 'devant_gauche', 'arriere_droite', 'arriere_gauche', 'devant_milieu', 'arriere_milieu']
+        
+        # CABANES (189)
+        print("📦 Création des 189 Cabanes...")
+        zones = ['A', 'B', 'C', 'D', 'E', 'F']
+        
+        for i in range(1, 190):
+            zone = zones[(i - 1) // 32]
+            numero = ((i - 1) % 32) + 1
+            emplacement = f"{zone}{numero}"
+            
+            cabane = Hebergement(
+                emplacement=emplacement,
+                type_id=type_cabane.id,
+                numero_chassis=f"CAB-2024-{str(i).zfill(3)}",
+                nb_personnes=4 if i % 3 == 0 else 2,
+                compteur_eau=compteurs[i % 6]
+            )
+            hebergements.append(cabane)
+        
+        # MOBIL HOMES STAFF (28)
+        print("📦 Création des 28 Mobil Homes Staff...")
+        for i in range(1, 29):
+            emplacement = f"STAFF-{str(i).zfill(2)}"
+            
+            mh_staff = Hebergement(
+                emplacement=emplacement,
+                type_id=type_mh_staff.id,
+                numero_chassis=f"MHS-2024-{str(i).zfill(3)}",
+                nb_personnes=2,
+                compteur_eau=compteurs[i % 6]
+            )
+            hebergements.append(mh_staff)
+        
+        # ESPACE BIEN ÊTRE (1)
+        print("📦 Création de l'Espace Bien Être...")
+        bien_etre = Hebergement(
+            emplacement='BIEN-ETRE-01',
+            type_id=type_bien_etre.id,
+            numero_chassis='EBE-2024-001',
+            nb_personnes=10,
+            compteur_eau='devant_milieu'
+        )
+        hebergements.append(bien_etre)
+        
+        # Sauvegarder en masse
+        db.session.add_all(hebergements)
+        db.session.commit()
+        
+        print(f"✅ {len(hebergements)} hébergements créés avec succès !")
+        print(f"📊 Total : {Hebergement.query.count()} hébergements")
 
 
 # ==================== ROUTES ====================
