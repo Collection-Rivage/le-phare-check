@@ -227,6 +227,12 @@ def delete_hebergement(id):
         return redirect(url_for('hebergements'))
     
     heb = Hebergement.query.get_or_404(id)
+    
+    # Vérifier qu'aucun check n'est lié à cet hébergement
+    if len(heb.checks) > 0:
+        flash(f'Impossible de supprimer : {len(heb.checks)} check(s) sont liés à cet hébergement', 'danger')
+        return redirect(url_for('hebergements'))
+    
     emplacement = heb.emplacement
     db.session.delete(heb)
     db.session.commit()
