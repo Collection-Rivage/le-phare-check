@@ -3,7 +3,7 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from config import Config
 from models import db, User, Hebergement, Check, TypeHebergement, Incident
 from mail import mail, send_welcome_email
-from sqlalchemy.orm import selectinload  # ✅ Ajout pour optimiser les requêtes SQL
+from sqlalchemy.orm import selectinload
 import os
 import random
 import string
@@ -121,26 +121,67 @@ def dashboard():
     return render_template('dashboard.html', total=total, ok=ok, alerte=alerte, probleme=probleme,
                          derniers_checks=derniers_checks, is_online=is_online)
 
-# ✅ ROUTE OPTIMISÉE POUR ÉVITER LE CHARGEMENT LENT
+# ✅ Route optimisée pour éviter le chargement lent
 @app.route('/hebergements')
 @login_required
 def hebergements():
-    # Récupérer le numéro de page (par défaut page 1)
     page = request.args.get('page', 1, type=int)
     
-    # Requête optimisée : charge tous les hébergements ET leurs types en UNE SEULE requête
-    # Au lieu de 219 requêtes avant, on n'en fait plus que 2 !
+    # Requête optimisée : charge tous les hébergements et leurs types en une seule requête
     hebergements_list = Hebergement.query.options(
         selectinload(Hebergement.type_hebergement)
     ).order_by(Hebergement.emplacement).paginate(
         page=page, 
-        per_page=20,  # On affiche 20 hébergements par page
+        per_page=20,
         error_out=False
     )
     
     types = TypeHebergement.query.all()
     is_online = os.environ.get('RENDER') is not None
     return render_template('hebergements.html', hebergements=hebergements_list, types=types, is_online=is_online)
+
+@app.route('/hebergements/add', methods=['POST'])
+@login_required
+def add_hebergement():
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('hebergements'))
+    
+    emplacement = request.form.get('emplacement')
+    type_id = request.form.get('type_id')
+    numero_chassis = request.form.get('numero_chassis')
+    nb_personnes = request.form.get('nb_personnes')
+    compteur_eau = request.form.get('compteur_eau')
+    
+    nouvel_heb = Hebergement(
+        emplacement=emplacement,
+        type_id=type_id,
+        numero_chassis=numero_chassis,
+        nb_personnes=nb_personnes,
+        compteur_eau=compteur_eau
+    )
+    db.session.add(nouvel_heb)
+    db.session.commit()
+    flash(f'Hébergement {emplacement} ajouté avec succès', 'success')
+    return redirect(url_for('hebergements'))
+
+@app.route('/hebergements/edit/<int:id>', methods=['POST'])
+@login_required
+def edit_hebergement(id):
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('hebergements'))
+    
+    heb = Hebergement.query.get_or_404(id)
+    heb.emplacement = request.form.get('emplacement')
+    heb.type_id = request.form.get('type_id')
+    heb.numero_chassis = request.form.get('numero_chassis')
+    heb.nb_personnes = request.form.get('nb_personnes')
+    heb.compteur_eau = request.form.get('compteur_eau')
+    
+    db.session.commit()
+    flash(f'Hébergement {heb.emplacement} modifié avec succès', 'success')
+    return redirect(url_for('hebergements'))
 
 @app.route('/hebergements/delete/<int:id>')
 @login_required
@@ -276,15 +317,18 @@ def signaler_incident(hebergement_id):
     is_online = os.environ.get('RENDER') is not None
     return render_template('incident.html', hebergement=hebergement, techniciens=techniciens, is_online=is_online)
 
+# ✅ Route corrigée pour résoudre l'erreur 'User is undefined'
 @app.route('/admin/users')
 @login_required
 def admin_users():
     if current_user.role != 'admin':
         flash('Accès refusé', 'danger')
         return redirect(url_for('dashboard'))
+    
     users = User.query.order_by(User.created_at.desc()).all()
+    admin_count = User.query.filter_by(role='admin').count()  # On calcule le nombre d'admin dans le backend
     is_online = os.environ.get('RENDER') is not None
-    return render_template('admin_users.html', users=users, is_online=is_online)
+    return render_template('admin_users.html', users=users, admin_count=admin_count, is_online=is_online)
 
 @app.route('/admin/users/add', methods=['POST'])
 @login_required
