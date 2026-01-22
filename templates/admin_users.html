@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Gestion des utilisateurs{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-people-fill"></i> Gestion des utilisateurs</h2>
+    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addUserModal">
+        <i class="bi bi-person-plus"></i> Ajouter un utilisateur
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Utilisateur</th>
+                        <th>Email</th>
+                        <th>Rôle</th>
+                        <th>Créé le</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td><strong>{{ user.username }}</strong></td>
+                        <td>{{ user.email }}</td>
+                        <td>
+                            <span class="badge
+                                {% if user.role == 'admin' %} bg-danger
+                                {% elif user.role == 'direction' %} bg-info text-dark
+                                {% elif user.role == 'technicien' %} bg-primary
+                                {% elif user.role == 'accueil' %} bg-secondary
+                                {% endif %}">
+                                {{ user.role|replace('_', ' ')|title }}
+                            </span>
+                        </td>
+                        <td>{{ user.created_at.strftime('%d/%m/%Y') }}</td>
+                        <td>
+                            <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#editModal{{ user.id }}">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            {% if user.id != current_user.id and (current_user.role == 'admin' and (user.role != 'admin' or User.query.filter_by(role='admin').count() > 1)) %}
+                            <a href="{{ url_for('delete_user', id=user.id) }}" class="btn btn-danger btn-sm" 
+                               onclick="return confirm('Supprimer {{ user.username }} ?')">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    <!-- Modal édition -->
+                    <div class="modal fade" id="editModal{{ user.id }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Modifier {{ user.username }}</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <form method="POST" action="{{ url_for('edit_user', id=user.id) }}">
+                                    <div class="modal-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">Rôle</label>
+                                            <select name="role" class="form-select" required>
+                                                <option value="technicien" {% if user.role == 'technicien' %}selected{% endif %}>Technicien</option>
+                                                <option value="accueil" {% if user.role == 'accueil' %}selected{% endif %}>Accueil</option>
+                                                <option value="direction" {% if user.role == 'direction' %}selected{% endif %}>Direction</option>
+                                                <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Administrateur</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Nouveau mot de passe (optionnel)</label>
+                                            <input type="password" name="password" class="form-control" placeholder="Laisser vide pour ne pas changer">
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="submit" class="btn btn-primary">Enregistrer</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal ajout -->
+<div class="modal fade" id="addUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="POST" action="{{ url_for('add_user') }}">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Nouvel utilisateur</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label>Nom d'utilisateur</label>
+                        <input type="text" name="username" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Email</label>
+                        <input type="email" name="email" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Mot de passe</label>
+                        <input type="password" name="password" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Rôle</label>
+                        <select name="role" class="form-select" required>
+                            <option value="technicien">Technicien</option>
+                            <option value="accueil">Accueil</option>
+                            <option value="direction">Direction</option>
+                            <option value="admin">Administrateur</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-success">Créer l'utilisateur</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
