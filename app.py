@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, Markup
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from jinja2 import Markup  # ✅ Import corrigé : Markup est maintenant dans jinja2
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from config import Config
 from models import db, User, Hebergement, Check, TypeHebergement, Incident
