@@ -128,6 +128,23 @@ def hebergements():
     is_online = os.environ.get('RENDER') is not None
     return render_template('hebergements.html', hebergements=hebergements_list, types=types, is_online=is_online)
 
+@app.route('/hebergements/delete/<int:id>')
+@login_required
+def delete_hebergement(id):
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('hebergements'))
+    
+    heb = Hebergement.query.get_or_404(id)
+    if len(heb.checks) > 0 or len(getattr(heb, 'incidents', [])) > 0:
+        flash('Impossible de supprimer : des checks ou incidents sont liés', 'danger')
+        return redirect(url_for('hebergements'))
+    
+    db.session.delete(heb)
+    db.session.commit()
+    flash('Hébergement supprimé', 'warning')
+    return redirect(url_for('hebergements'))
+
 @app.route('/check/<int:hebergement_id>', methods=['GET', 'POST'])
 @login_required
 def check(hebergement_id):
@@ -147,14 +164,12 @@ def check(hebergement_id):
             probleme_critique=request.form.get('probleme_critique') == 'on'
         )
         db.session.add(nouveau_check)
-        
         if nouveau_check.probleme_critique:
             hebergement.statut = 'probleme'
         elif not all([nouveau_check.electricite, nouveau_check.plomberie, nouveau_check.chauffage, nouveau_check.proprete, nouveau_check.equipements]):
             hebergement.statut = 'alerte'
         else:
             hebergement.statut = 'ok'
-        
         db.session.commit()
         flash('Check enregistré !', 'success')
         return redirect(url_for('dashboard'))
@@ -234,7 +249,7 @@ def add_user():
         db.session.add(user)
         db.session.commit()
         send_welcome_email(user, password)
-        flash(f'Utilisateur {username} créé et email envoyé !', 'success')
+        flash(f'Utilisateur {username} créé !', 'success')
     return redirect(url_for('admin_users'))
 
 @app.route('/api/status')
