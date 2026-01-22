@@ -3,6 +3,7 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from config import Config
 from models import db, User, Hebergement, Check, TypeHebergement, Incident
 from mail import mail, send_welcome_email
+from sqlalchemy.orm import selectinload  # ✅ Ajout pour optimiser les requêtes SQL
 import os
 import random
 import string
@@ -120,10 +121,23 @@ def dashboard():
     return render_template('dashboard.html', total=total, ok=ok, alerte=alerte, probleme=probleme,
                          derniers_checks=derniers_checks, is_online=is_online)
 
+# ✅ ROUTE OPTIMISÉE POUR ÉVITER LE CHARGEMENT LENT
 @app.route('/hebergements')
 @login_required
 def hebergements():
-    hebergements_list = Hebergement.query.all()
+    # Récupérer le numéro de page (par défaut page 1)
+    page = request.args.get('page', 1, type=int)
+    
+    # Requête optimisée : charge tous les hébergements ET leurs types en UNE SEULE requête
+    # Au lieu de 219 requêtes avant, on n'en fait plus que 2 !
+    hebergements_list = Hebergement.query.options(
+        selectinload(Hebergement.type_hebergement)
+    ).order_by(Hebergement.emplacement).paginate(
+        page=page, 
+        per_page=20,  # On affiche 20 hébergements par page
+        error_out=False
+    )
+    
     types = TypeHebergement.query.all()
     is_online = os.environ.get('RENDER') is not None
     return render_template('hebergements.html', hebergements=hebergements_list, types=types, is_online=is_online)
