@@ -1,10 +1,9 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, Markup
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from config import Config
 from models import db, User, Hebergement, Check, TypeHebergement, Incident
-from mail import mail, send_welcome_email
 from sqlalchemy.orm import selectinload
-from sqlalchemy import case, cast, Integer, func  # ✅ Ajout pour le tri numérique intelligent
+from sqlalchemy import case, cast, Integer, func
 import os
 import random
 import string
@@ -13,7 +12,6 @@ app = Flask(__name__)
 app.config.from_object(Config)
 
 db.init_app(app)
-mail.init_app(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -122,31 +120,25 @@ def dashboard():
     return render_template('dashboard.html', total=total, ok=ok, alerte=alerte, probleme=probleme,
                          derniers_checks=derniers_checks, is_online=is_online)
 
-# ✅ Route optimisée ET TRI NUMÉRIQUE INTELLIGENT
+# ✅ Route optimisée avec TRI NUMÉRIQUE et PAGINATION
 @app.route('/hebergements')
 @login_required
 def hebergements():
     page = request.args.get('page', 1, type=int)
     
-    # Requête optimisée avec tri personnalisé en ordre logique :
-    # 1. Cabanes dans l'ordre numérique : 1, 2, 3, ..., 189
-    # 2. Mobil-homes Staff dans l'ordre : STAFF-01, STAFF-02, ..., STAFF-28
-    # 3. Enfin l'Espace Bien Être
     hebergements_list = Hebergement.query.options(
         selectinload(Hebergement.type_hebergement)
     ).order_by(
-        # Étape 1 : On regroupe les hébergements par catégorie
+        # Tri par catégorie : Cabanes d'abord, puis Staff, puis Bien Être
         case(
-            (Hebergement.emplacement.op('~')(r'^\d+\('), 1),  # Cabanes (numéros seuls) en premier
-            (Hebergement.emplacement.startswith('STAFF'), 2),  # Puis les mobil-homes staff
-            (Hebergement.emplacement.startswith('BIEN'), 3),  # Enfin l'espace bien-être
+            (Hebergement.emplacement.op('~')(r'^\d+\('), 1),
+            (Hebergement.emplacement.startswith('STAFF'), 2),
+            (Hebergement.emplacement.startswith('BIEN'), 3),
             else_=4
         ),
-        # Étape 2 : On trie numériquement DANS chaque catégorie
+        # Tri numérique dans chaque catégorie
         case(
-            # Tri numérique pour les cabanes
             (Hebergement.emplacement.op('~')(r'^\d+\)'), cast(Hebergement.emplacement, Integer)),
-            # Tri numérique pour les STAFF (on extrait le chiffre après "STAFF-")
             (Hebergement.emplacement.startswith('STAFF'), cast(func.substring(Hebergement.emplacement, 7), Integer)),
             else_=0
         )
@@ -349,6 +341,7 @@ def admin_users():
     is_online = os.environ.get('RENDER') is not None
     return render_template('admin_users.html', users=users, admin_count=admin_count, is_online=is_online)
 
+# ✅ Route corrigée pour éviter les crashes et les timeouts
 @app.route('/admin/users/add', methods=['POST'])
 @login_required
 def add_user():
@@ -366,13 +359,18 @@ def add_user():
     elif User.query.filter_by(email=email).first():
         flash('Email déjà utilisé', 'danger')
     else:
+        # Générer un mot de passe sécurisé si non fourni
         password = password_input or ''.join(random.choices(string.ascii_letters + string.digits, k=12))
         user = User(username=username, email=email, role=role)
         user.set_password(password)
         db.session.add(user)
         db.session.commit()
-        send_welcome_email(user, password)
-        flash(f'Utilisateur {username} créé !', 'success')
+        
+        # 📩 Envoi d'email désactivé pour éviter les blocages sur le plan gratuit Render
+        flash(f'✅ Utilisateur {username} créé avec succès !', 'success')
+        flash(Markup(f'🔑 Mot de passe temporaire : <strong>{password}</strong>'), 'info')
+        flash('💡 Communiquez ce mot de passe manuellement à l\'utilisateur.', 'primary')
+    
     return redirect(url_for('admin_users'))
 
 @app.route('/admin/users/edit/<int:id>', methods=['POST'])
