@@ -7,7 +7,6 @@ db = SQLAlchemy()
 
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
-    
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
@@ -22,26 +21,16 @@ class User(UserMixin, db.Model):
     
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
-    
-    def __repr__(self):
-        return f'<User {self.username}>'
-
 
 class TypeHebergement(db.Model):
     __tablename__ = 'types_hebergement'
-    
     id = db.Column(db.Integer, primary_key=True)
     nom = db.Column(db.String(100), unique=True, nullable=False)
     description = db.Column(db.String(255))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    def __repr__(self):
-        return f'<TypeHebergement {self.nom}>'
-
 
 class Hebergement(db.Model):
     __tablename__ = 'hebergements'
-    
     id = db.Column(db.Integer, primary_key=True)
     emplacement = db.Column(db.String(50), nullable=False)
     type_id = db.Column(db.Integer, db.ForeignKey('types_hebergement.id'), nullable=False)
@@ -52,50 +41,34 @@ class Hebergement(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     checks = db.relationship('Check', backref='hebergement', lazy=True)
-    incidents = db.relationship('Incident', backref='hebergement', lazy=True)
     type_hebergement = db.relationship('TypeHebergement', backref='hebergements')
-    
-    def __repr__(self):
-        return f'<Hebergement {self.emplacement}>'
-
 
 class Check(db.Model):
     __tablename__ = 'checks'
-    
     id = db.Column(db.Integer, primary_key=True)
     hebergement_id = db.Column(db.Integer, db.ForeignKey('hebergements.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    
     electricite = db.Column(db.Boolean, default=True)
     plomberie = db.Column(db.Boolean, default=True)
     chauffage = db.Column(db.Boolean, default=True)
     proprete = db.Column(db.Boolean, default=True)
     equipements = db.Column(db.Boolean, default=True)
-    
     observations = db.Column(db.Text)
     probleme_critique = db.Column(db.Boolean, default=False)
-    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    def __repr__(self):
-        return f'<Check {self.id} - {self.hebergement.emplacement}>'
-
 
 class Incident(db.Model):
     __tablename__ = 'incidents'
-    
     id = db.Column(db.Integer, primary_key=True)
     hebergement_id = db.Column(db.Integer, db.ForeignKey('hebergements.id'), nullable=False)
-    type_incident = db.Column(db.String(20), nullable=False)  # probleme / urgence
+    type_incident = db.Column(db.String(20), nullable=False)
     description = db.Column(db.Text, nullable=False)
     assigne_a = db.Column(db.Integer, db.ForeignKey('users.id'))
-    statut = db.Column(db.String(20), default='nouveau')  # nouveau, en_cours, resolu
+    statut = db.Column(db.String(20), default='nouveau')
     cree_par = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     cree_le = db.Column(db.DateTime, default=datetime.utcnow)
     
+    # Relations
     hebergement = db.relationship('Hebergement', backref='incidents')
     technicien = db.relationship('User', foreign_keys=[assigne_a], backref='incidents_assignes')
-    createur = db.relationship('User', foreign_keys=[cree_par])
-    
-    def __repr__(self):
-        return f'<Incident {self.type_incident} - {self.hebergement.emplacement}>'
+    createur = db.relationship('User', foreign_keys=[cree_par], backref='incidents_crees')
