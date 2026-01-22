@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
-from markupsafe import Markup  # ✅ Emplacement correct de Markup depuis les versions récentes
+from markupsafe import Markup
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from config import Config
 from models import db, User, Hebergement, Check, TypeHebergement, Incident
@@ -330,6 +330,7 @@ def signaler_incident(hebergement_id):
     is_online = os.environ.get('RENDER') is not None
     return render_template('incident.html', hebergement=hebergement, techniciens=techniciens, is_online=is_online)
 
+# ✅ Gestion complète des utilisateurs
 @app.route('/admin/users')
 @login_required
 def admin_users():
@@ -342,7 +343,6 @@ def admin_users():
     is_online = os.environ.get('RENDER') is not None
     return render_template('admin_users.html', users=users, admin_count=admin_count, is_online=is_online)
 
-# ✅ Route corrigée pour éviter les crashes et les timeouts
 @app.route('/admin/users/add', methods=['POST'])
 @login_required
 def add_user():
@@ -360,16 +360,60 @@ def add_user():
     elif User.query.filter_by(email=email).first():
         flash('Email déjà utilisé', 'danger')
     else:
-        # Générer un mot de passe sécurisé si non fourni
         password = password_input or ''.join(random.choices(string.ascii_letters + string.digits, k=12))
         user = User(username=username, email=email, role=role)
         user.set_password(password)
         db.session.add(user)
         db.session.commit()
         
-        # 📩 Envoi d'email désactivé pour éviter les blocages sur le plan gratuit Render
         flash(f'✅ Utilisateur {username} créé avec succès !', 'success')
         flash(Markup(f'🔑 Mot de passe temporaire : <strong>{password}</strong>'), 'info')
         flash('💡 Communiquez ce mot de passe manuellement à l\'utilisateur.', 'primary')
     
     return redirect(url_for('admin_users'))
+
+@app.route('/admin/users/edit/<int:id>', methods=['POST'])
+@login_required
+def edit_user(id):
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('admin_users'))
+    
+    user = User.query.get_or_404(id)
+    user.role = request.form.get('role')
+    if request.form.get('password'):
+        user.set_password(request.form.get('password'))
+    db.session.commit()
+    flash('Utilisateur modifié', 'success')
+    return redirect(url_for('admin_users'))
+
+# ✅ Route de suppression d'utilisateurs bien définie
+@app.route('/admin/users/delete/<int:id>')
+@login_required
+def delete_user(id):
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('admin_users'))
+    
+    user = User.query.get_or_404(id)
+    
+    # Protection contre la suppression de soi-même
+    if user.id == current_user.id:
+        flash('Tu ne peux pas te supprimer toi-même !', 'danger')
+    # Protection contre la suppression du dernier administrateur
+    elif user.role == 'admin' and User.query.filter_by(role='admin').count() == 1:
+        flash('Il doit rester au moins un administrateur dans l\'application', 'danger')
+    else:
+        db.session.delete(user)
+        db.session.commit()
+        flash(f'Utilisateur {user.username} supprimé avec succès', 'warning')
+    
+    return redirect(url_for('admin_users'))
+
+@app.route('/api/status')
+def api_status():
+    is_online = os.environ.get('RENDER') is not None
+    return jsonify({'status': 'online' if is_online else 'local'})
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5000)
