@@ -23,15 +23,13 @@ def load_user(user_id):
 with app.app_context():
     db.create_all()
     
-    # Admin par défaut
     if User.query.count() == 0:
         admin = User(username='admin', email='admin@lephare.com', role='admin')
         admin.set_password('admin123')
         db.session.add(admin)
         db.session.commit()
-        print("Admin créé : admin / admin123")
+        print("Admin créé")
     
-    # Types par défaut
     if TypeHebergement.query.count() == 0:
         types_defaut = [
             TypeHebergement(nom='Cabane', description='Cabane sur pilotis'),
@@ -43,7 +41,6 @@ with app.app_context():
         db.session.commit()
         print("Types créés")
     
-    # Hébergements (exécuté une seule fois)
     if Hebergement.query.count() == 0:
         print("Création des 218 hébergements...")
         type_cabane = TypeHebergement.query.filter_by(nom='Cabane').first()
@@ -53,7 +50,6 @@ with app.app_context():
         h = []
         compteurs = ['devant_droite', 'devant_gauche', 'arriere_droite', 'arriere_gauche', 'devant_milieu', 'arriere_milieu']
         
-        # 189 Cabanes → 1 à 189
         for i in range(1, 190):
             h.append(Hebergement(
                 emplacement=str(i),
@@ -63,7 +59,6 @@ with app.app_context():
                 compteur_eau=compteurs[i % 6]
             ))
         
-        # 28 Mobil-homes Staff
         for i in range(1, 29):
             h.append(Hebergement(
                 emplacement=f"STAFF-{str(i).zfill(2)}",
@@ -73,7 +68,6 @@ with app.app_context():
                 compteur_eau=compteurs[i % 6]
             ))
         
-        # 1 Espace Bien-Être
         h.append(Hebergement(
             emplacement='BIEN-ETRE-01',
             type_id=type_bien_etre.id,
@@ -84,7 +78,7 @@ with app.app_context():
         
         db.session.add_all(h)
         db.session.commit()
-        print(f"{len(h)} hébergements créés !")
+        print("218 hébergements créés !")
 
 
 # ===================== ROUTES =====================
@@ -138,8 +132,8 @@ def add_hebergement():
     if current_user.role != 'admin':
         flash('Accès refusé', 'danger')
         return redirect(url_for('hebergements'))
-    # ... (code inchangé)
-    pass  # garde ton code existant
+    # ... ton code
+    pass
 
 @app.route('/hebergements/edit/<int:id>', methods=['POST'])
 @login_required
@@ -147,7 +141,7 @@ def edit_hebergement(id):
     if current_user.role != 'admin':
         flash('Accès refusé', 'danger')
         return redirect(url_for('hebergements'))
-    # ... (code inchangé)
+    # ... ton code
     pass
 
 @app.route('/hebergements/delete/<int:id>')
@@ -158,7 +152,7 @@ def delete_hebergement(id):
         return redirect(url_for('hebergements'))
     
     heb = Hebergement.query.get_or_404(id)
-    if len(heb.checks) > 0 or len(heb.incidents) > 0:
+    if len(heb.checks) > 0 or len(getattr(heb, 'incidents', [])) > 0:
         flash('Impossible de supprimer : des checks ou incidents sont liés', 'danger')
         return redirect(url_for('hebergements'))
     
@@ -166,6 +160,64 @@ def delete_hebergement(id):
     db.session.commit()
     flash('Hébergement supprimé', 'warning')
     return redirect(url_for('hebergements'))
+
+
+# ===================== TYPES D'HÉBERGEMENT =====================
+@app.route('/types')
+@login_required
+def types():
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    types = TypeHebergement.query.all()
+    is_online = os.environ.get('RENDER') is not None
+    return render_template('types.html', types=types, is_online=is_online)
+
+
+@app.route('/types/add', methods=['POST'])
+@login_required
+def add_type():
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('types'))
+    nom = request.form.get('nom')
+    description = request.form.get('description')
+    nouveau = TypeHebergement(nom=nom, description=description)
+    db.session.add(nouveau)
+    db.session.commit()
+    flash(f'Type "{nom}" ajouté', 'success')
+    return redirect(url_for('types'))
+
+
+@app.route('/types/edit/<int:id>', methods=['POST'])
+@login_required
+def edit_type(id):
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('types'))
+    t = TypeHebergement.query.get_or_404(id)
+    t.nom = request.form.get('nom')
+    t.description = request.form.get('description')
+    db.session.commit()
+    flash('Type modifié', 'success')
+    return redirect(url_for('types'))
+
+
+@app.route('/types/delete/<int:id>')
+@login_required
+def delete_type(id):
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('types'))
+    t = TypeHebergement.query.get_or_404(id)
+    if len(t.hebergements) > 0:
+        flash('Impossible : des hébergements utilisent ce type', 'danger')
+    else:
+        db.session.delete(t)
+        db.session.commit()
+        flash('Type supprimé', 'warning')
+    return redirect(url_for('types'))
 
 
 # ===================== SIGNALER UN INCIDENT =====================
@@ -185,14 +237,13 @@ def signaler_incident(hebergement_id):
         )
         db.session.add(incident)
         
-        # Mise à jour du statut
         if request.form.get('type_incident') == 'urgence':
             hebergement.statut = 'probleme'
         else:
             hebergement.statut = 'alerte'
         
         db.session.commit()
-        flash('Incident signalé avec succès !', 'success')
+        flash('Incident signalé !', 'success')
         return redirect(url_for('hebergements'))
     
     is_online = os.environ.get('RENDER') is not None
@@ -202,7 +253,7 @@ def signaler_incident(hebergement_id):
 @app.route('/check/<int:hebergement_id>', methods=['GET', 'POST'])
 @login_required
 def check(hebergement_id):
-    # ... (ton code existant pour les checks)
+    # ... ton code de check
     pass
 
 @app.route('/historique')
@@ -215,7 +266,7 @@ def historique():
 @app.route('/api/status')
 def api_status():
     is_online = os.environ.get('RENDER') is not None
-    return jsonify({'status': 'online' if is_online else 'local', 'app': 'Le Phare Check'})
+    return jsonify({'status': 'online' if is_online else 'local'})
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
