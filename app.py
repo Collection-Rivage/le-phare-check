@@ -298,6 +298,39 @@ def add_user():
         flash(f'Utilisateur {username} créé !', 'success')
     return redirect(url_for('admin_users'))
 
+@app.route('/admin/users/edit/<int:id>', methods=['POST'])
+@login_required
+def edit_user(id):
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('admin_users'))
+    
+    user = User.query.get_or_404(id)
+    user.role = request.form.get('role')
+    if request.form.get('password'):
+        user.set_password(request.form.get('password'))
+    db.session.commit()
+    flash('Utilisateur modifié', 'success')
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/users/delete/<int:id>')
+@login_required
+def delete_user(id):
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('admin_users'))
+    
+    user = User.query.get_or_404(id)
+    if user.id == current_user.id:
+        flash('Tu ne peux pas te supprimer toi-même !', 'danger')
+    elif user.role == 'admin' and User.query.filter_by(role='admin').count() == 1:
+        flash('Il doit rester au moins un administrateur', 'danger')
+    else:
+        db.session.delete(user)
+        db.session.commit()
+        flash(f'Utilisateur {user.username} supprimé', 'warning')
+    return redirect(url_for('admin_users'))
+
 @app.route('/api/status')
 def api_status():
     is_online = os.environ.get('RENDER') is not None
