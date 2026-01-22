@@ -35,6 +35,7 @@
                                 {% elif user.role == 'accueil' %} bg-secondary
                                 {% endif %}">
                                 {{ user.role|replace('_', ' ')|title }}
+                                {% if user.role == 'admin' %} <i class="bi bi-shield-lock ms-1"></i>{% endif %}
                             </span>
                         </td>
                         <td>{{ user.created_at.strftime('%d/%m/%Y') }}</td>
@@ -42,13 +43,19 @@
                             <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#editModal{{ user.id }}">
                                 <i class="bi bi-pencil"></i> Modifier
                             </button>
-                            {% if user.id != current_user.id and (user.role != 'admin' or User.query.filter_by(role='admin').count() > 1) %}
-                            <a href="{{ url_for('delete_user', id=user.id) }}" class="btn btn-danger btn-sm" 
-                               onclick="return confirm('Êtes-vous sûr de vouloir supprimer {{ user.username }} ?')">
-                                <i class="bi bi-trash"></i> Supprimer
-                            </a>
+                            {% if user.id != current_user.id %}
+                                {% if user.role == 'admin' and User.query.filter_by(role='admin').count() == 1 %}
+                                <button class="btn btn-danger btn-sm" disabled title="Impossible : il doit rester au moins un administrateur">
+                                    <i class="bi bi-trash"></i> Supprimer
+                                </button>
+                                {% else %}
+                                <a href="{{ url_for('delete_user', id=user.id) }}" class="btn btn-danger btn-sm" 
+                                   onclick="return confirm('Êtes-vous sûr de vouloir supprimer {{ user.username }} ?')">
+                                    <i class="bi bi-trash"></i> Supprimer
+                                </a>
+                                {% endif %}
                             {% else %}
-                            <button class="btn btn-danger btn-sm" disabled title="Action impossible">
+                            <button class="btn btn-danger btn-sm" disabled title="Tu ne peux pas te supprimer toi-même">
                                 <i class="bi bi-trash"></i> Supprimer
                             </button>
                             {% endif %}
@@ -61,7 +68,7 @@
     </div>
 </div>
 
-<!-- ✅ Modales d'édition placées EN DEHORS de la boucle pour éviter les conflits d'ID -->
+<!-- Modales d'édition -->
 {% for user in users %}
 <div class="modal fade" id="editModal{{ user.id }}" tabindex="-1" aria-labelledby="editModalLabel{{ user.id }}" aria-hidden="true">
     <div class="modal-dialog">
@@ -78,7 +85,9 @@
                             <option value="technicien" {% if user.role == 'technicien' %}selected{% endif %}>Technicien</option>
                             <option value="accueil" {% if user.role == 'accueil' %}selected{% endif %}>Accueil</option>
                             <option value="direction" {% if user.role == 'direction' %}selected{% endif %}>Direction</option>
-                            <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Administrateur</option>
+                            <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>
+                                Administrateur <span class="text-danger small">(Accès total)</span>
+                            </option>
                         </select>
                     </div>
                     <div class="mb-3">
@@ -125,7 +134,9 @@
                             <option value="technicien" selected>Technicien</option>
                             <option value="accueil">Accueil</option>
                             <option value="direction">Direction</option>
-                            <option value="admin">Administrateur</option>
+                            <option value="admin">
+                                Administrateur <span class="text-danger small">(Accès total à l'application)</span>
+                            </option>
                         </select>
                     </div>
                 </div>
