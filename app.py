@@ -4,6 +4,7 @@ from config import Config
 from models import db, User, Hebergement, Check, TypeHebergement, Incident
 from mail import mail, send_welcome_email
 from sqlalchemy.orm import selectinload
+from sqlalchemy import case, cast, Integer, func  # ✅ Ajout pour le tri numérique intelligent
 import os
 import random
 import string
@@ -121,16 +122,35 @@ def dashboard():
     return render_template('dashboard.html', total=total, ok=ok, alerte=alerte, probleme=probleme,
                          derniers_checks=derniers_checks, is_online=is_online)
 
-# ✅ Route optimisée pour éviter le chargement lent
+# ✅ Route optimisée ET TRI NUMÉRIQUE INTELLIGENT
 @app.route('/hebergements')
 @login_required
 def hebergements():
     page = request.args.get('page', 1, type=int)
     
-    # Requête optimisée : charge tous les hébergements et leurs types en une seule requête
+    # Requête optimisée avec tri personnalisé en ordre logique :
+    # 1. Cabanes dans l'ordre numérique : 1, 2, 3, ..., 189
+    # 2. Mobil-homes Staff dans l'ordre : STAFF-01, STAFF-02, ..., STAFF-28
+    # 3. Enfin l'Espace Bien Être
     hebergements_list = Hebergement.query.options(
         selectinload(Hebergement.type_hebergement)
-    ).order_by(Hebergement.emplacement).paginate(
+    ).order_by(
+        # Étape 1 : On regroupe les hébergements par catégorie
+        case(
+            (Hebergement.emplacement.op('~')(r'^\d+\('), 1),  # Cabanes (numéros seuls) en premier
+            (Hebergement.emplacement.startswith('STAFF'), 2),  # Puis les mobil-homes staff
+            (Hebergement.emplacement.startswith('BIEN'), 3),  # Enfin l'espace bien-être
+            else_=4
+        ),
+        # Étape 2 : On trie numériquement DANS chaque catégorie
+        case(
+            # Tri numérique pour les cabanes
+            (Hebergement.emplacement.op('~')(r'^\d+\)'), cast(Hebergement.emplacement, Integer)),
+            # Tri numérique pour les STAFF (on extrait le chiffre après "STAFF-")
+            (Hebergement.emplacement.startswith('STAFF'), cast(func.substring(Hebergement.emplacement, 7), Integer)),
+            else_=0
+        )
+    ).paginate(
         page=page, 
         per_page=20,
         error_out=False
@@ -317,7 +337,6 @@ def signaler_incident(hebergement_id):
     is_online = os.environ.get('RENDER') is not None
     return render_template('incident.html', hebergement=hebergement, techniciens=techniciens, is_online=is_online)
 
-# ✅ Route corrigée pour résoudre l'erreur 'User is undefined'
 @app.route('/admin/users')
 @login_required
 def admin_users():
@@ -326,7 +345,7 @@ def admin_users():
         return redirect(url_for('dashboard'))
     
     users = User.query.order_by(User.created_at.desc()).all()
-    admin_count = User.query.filter_by(role='admin').count()  # On calcule le nombre d'admin dans le backend
+    admin_count = User.query.filter_by(role='admin').count()
     is_online = os.environ.get('RENDER') is not None
     return render_template('admin_users.html', users=users, admin_count=admin_count, is_online=is_online)
 
