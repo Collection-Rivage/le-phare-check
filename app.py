@@ -20,11 +20,68 @@ login_manager.login_view = 'login'
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# Initialisation
+
+# ===================== INITIALISATION =====================
 with app.app_context():
     db.create_all()
-    # ... (le code d’initialisation des 218 hébergements que tu as déjà)
-    # Il reste inchangé
+    
+    if User.query.count() == 0:
+        admin = User(username='admin', email='admin@lephare.com', role='admin')
+        admin.set_password('admin123')
+        db.session.add(admin)
+        db.session.commit()
+        print("Admin créé")
+    
+    if TypeHebergement.query.count() == 0:
+        types_defaut = [
+            TypeHebergement(nom='Cabane'),
+            TypeHebergement(nom='Mobil-home Staff'),
+            TypeHebergement(nom='Mobil-home Standard'),
+            TypeHebergement(nom='Espace Bien Être'),
+        ]
+        db.session.add_all(types_defaut)
+        db.session.commit()
+        print("Types créés")
+    
+    if Hebergement.query.count() == 0:
+        print("Création des 218 hébergements...")
+        type_cabane = TypeHebergement.query.filter_by(nom='Cabane').first()
+        type_mh_staff = TypeHebergement.query.filter_by(nom='Mobil-home Staff').first()
+        type_bien_etre = TypeHebergement.query.filter_by(nom='Espace Bien Être').first()
+        
+        h = []
+        compteurs = ['devant_droite', 'devant_gauche', 'arriere_droite', 'arriere_gauche', 'devant_milieu', 'arriere_milieu']
+        
+        for i in range(1, 190):
+            h.append(Hebergement(
+                emplacement=str(i),
+                type_id=type_cabane.id,
+                numero_chassis=f"CAB-2024-{str(i).zfill(3)}",
+                nb_personnes=4 if i % 3 == 0 else 2,
+                compteur_eau=compteurs[i % 6]
+            ))
+        
+        for i in range(1, 29):
+            h.append(Hebergement(
+                emplacement=f"STAFF-{str(i).zfill(2)}",
+                type_id=type_mh_staff.id,
+                numero_chassis=f"MHS-2024-{str(i).zfill(3)}",
+                nb_personnes=2,
+                compteur_eau=compteurs[i % 6]
+            ))
+        
+        h.append(Hebergement(
+            emplacement='BIEN-ETRE-01',
+            type_id=type_bien_etre.id,
+            numero_chassis='EBE-2024-001',
+            nb_personnes=10,
+            compteur_eau='devant_milieu'
+        ))
+        
+        db.session.add_all(h)
+        db.session.commit()
+        print("218 hébergements créés !")
+
 
 # ===================== ROUTES =====================
 
@@ -71,6 +128,56 @@ def hebergements():
     is_online = os.environ.get('RENDER') is not None
     return render_template('hebergements.html', hebergements=hebergements_list, types=types, is_online=is_online)
 
+@app.route('/check/<int:hebergement_id>', methods=['GET', 'POST'])
+@login_required
+def check(hebergement_id):
+    hebergement = Hebergement.query.get_or_404(hebergement_id)
+    is_online = os.environ.get('RENDER') is not None
+    
+    if request.method == 'POST':
+        nouveau_check = Check(
+            hebergement_id=hebergement_id,
+            user_id=current_user.id,
+            electricite=request.form.get('electricite') == 'on',
+            plomberie=request.form.get('plomberie') == 'on',
+            chauffage=request.form.get('chauffage') == 'on',
+            proprete=request.form.get('proprete') == 'on',
+            equipements=request.form.get('equipements') == 'on',
+            observations=request.form.get('observations'),
+            probleme_critique=request.form.get('probleme_critique') == 'on'
+        )
+        db.session.add(nouveau_check)
+        
+        if nouveau_check.probleme_critique:
+            hebergement.statut = 'probleme'
+        elif not all([nouveau_check.electricite, nouveau_check.plomberie, nouveau_check.chauffage, nouveau_check.proprete, nouveau_check.equipements]):
+            hebergement.statut = 'alerte'
+        else:
+            hebergement.statut = 'ok'
+        
+        db.session.commit()
+        flash('Check enregistré !', 'success')
+        return redirect(url_for('dashboard'))
+    
+    return render_template('check.html', hebergement=hebergement, is_online=is_online)
+
+@app.route('/historique')
+@login_required
+def historique():
+    checks = Check.query.order_by(Check.created_at.desc()).all()
+    is_online = os.environ.get('RENDER') is not None
+    return render_template('historique.html', checks=checks, is_online=is_online)
+
+@app.route('/types')
+@login_required
+def types():
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('dashboard'))
+    types = TypeHebergement.query.all()
+    is_online = os.environ.get('RENDER') is not None
+    return render_template('types.html', types=types, is_online=is_online)
+
 @app.route('/incident/<int:hebergement_id>', methods=['GET', 'POST'])
 @login_required
 def signaler_incident(hebergement_id):
@@ -93,16 +200,6 @@ def signaler_incident(hebergement_id):
     
     is_online = os.environ.get('RENDER') is not None
     return render_template('incident.html', hebergement=hebergement, techniciens=techniciens, is_online=is_online)
-
-@app.route('/types')
-@login_required
-def types():
-    if current_user.role != 'admin':
-        flash('Accès refusé', 'danger')
-        return redirect(url_for('dashboard'))
-    types = TypeHebergement.query.all()
-    is_online = os.environ.get('RENDER') is not None
-    return render_template('types.html', types=types, is_online=is_online)
 
 @app.route('/admin/users')
 @login_required
@@ -140,4 +237,10 @@ def add_user():
         flash(f'Utilisateur {username} créé et email envoyé !', 'success')
     return redirect(url_for('admin_users'))
 
-# ... (les autres routes : edit_user, delete_user, check, etc.)
+@app.route('/api/status')
+def api_status():
+    is_online = os.environ.get('RENDER') is not None
+    return jsonify({'status': 'online' if is_online else 'local'})
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5000)
