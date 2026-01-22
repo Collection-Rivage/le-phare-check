@@ -193,6 +193,52 @@ def types():
     is_online = os.environ.get('RENDER') is not None
     return render_template('types.html', types=types, is_online=is_online)
 
+@app.route('/types/add', methods=['POST'])
+@login_required
+def add_type():
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('types'))
+    nom = request.form.get('nom')
+    description = request.form.get('description', '')
+    if TypeHebergement.query.filter_by(nom=nom).first():
+        flash('Ce type existe déjà', 'danger')
+    else:
+        nouveau = TypeHebergement(nom=nom, description=description)
+        db.session.add(nouveau)
+        db.session.commit()
+        flash(f'Type "{nom}" ajouté', 'success')
+    return redirect(url_for('types'))
+
+@app.route('/types/edit/<int:id>', methods=['POST'])
+@login_required
+def edit_type(id):
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('types'))
+    type_heb = TypeHebergement.query.get_or_404(id)
+    type_heb.nom = request.form.get('nom')
+    type_heb.description = request.form.get('description', '')
+    db.session.commit()
+    flash('Type modifié', 'success')
+    return redirect(url_for('types'))
+
+@app.route('/types/delete/<int:id>')
+@login_required
+def delete_type(id):
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('types'))
+    
+    type_heb = TypeHebergement.query.get_or_404(id)
+    if len(type_heb.hebergements) > 0:
+        flash('Impossible : des hébergements utilisent ce type', 'danger')
+    else:
+        db.session.delete(type_heb)
+        db.session.commit()
+        flash('Type supprimé', 'warning')
+    return redirect(url_for('types'))
+
 @app.route('/incident/<int:hebergement_id>', methods=['GET', 'POST'])
 @login_required
 def signaler_incident(hebergement_id):
