@@ -1,4 +1,4 @@
-/* Le Phare Check - Design inspiré Le Phare Île de Ré */
+/* Le Phare Check - Design inspiré Le Phare Île de Ré (amélioré) */
 
 :root {
     --phare-navy: #1a3a52;
@@ -10,6 +10,17 @@
     --phare-success: #4a7c59;
     --phare-warning: #d4a574;
     --phare-danger: #a64b4b;
+
+    --phare-text-muted: #5a6c7d;
+
+    --phare-radius-sm: 6px;
+    --phare-radius-md: 10px;
+    --phare-radius-lg: 12px;
+
+    --phare-shadow-sm: 0 4px 12px rgba(26, 58, 82, 0.08);
+    --phare-shadow-md: 0 8px 24px rgba(26, 58, 82, 0.15);
+
+    --phare-focus: 0 0 0 0.2rem rgba(44, 95, 124, 0.18);
 }
 
 * {
@@ -23,6 +34,26 @@ body {
     background-color: var(--phare-beige);
     color: var(--phare-navy);
     line-height: 1.6;
+    padding-bottom: 3rem;
+}
+
+/* Liens (dashboard : cartes cliquables) */
+a {
+    color: inherit;
+}
+
+a:hover {
+    color: inherit;
+}
+
+a.text-decoration-none:focus-visible,
+button:focus-visible,
+.btn:focus-visible,
+.form-control:focus-visible,
+.form-select:focus-visible,
+.page-link:focus-visible {
+    outline: none;
+    box-shadow: var(--phare-focus) !important;
 }
 
 /* ============ HEADER ============ */
@@ -64,6 +95,14 @@ body {
 .badge.bg-warning {
     background-color: var(--phare-warning) !important;
     color: var(--phare-navy) !important;
+}
+
+.badge.bg-danger {
+    background-color: var(--phare-danger) !important;
+}
+
+.badge.bg-info {
+    background-color: var(--phare-blue) !important;
 }
 
 /* ============ NAVIGATION ============ */
@@ -109,10 +148,10 @@ body {
 /* ============ BOUTONS ============ */
 
 .btn {
-    border-radius: 6px;
-    font-weight: 500;
-    padding: 0.6rem 1.5rem;
-    transition: all 0.3s ease;
+    border-radius: var(--phare-radius-sm);
+    font-weight: 600;
+    padding: 0.6rem 1.2rem;
+    transition: all 0.25s ease;
     border: none;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -127,7 +166,7 @@ body {
 .btn-primary:hover {
     background: linear-gradient(135deg, var(--phare-navy) 0%, var(--phare-blue) 100%);
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(26, 58, 82, 0.3);
+    box-shadow: 0 6px 20px rgba(26, 58, 82, 0.25);
 }
 
 .btn-success {
@@ -138,7 +177,7 @@ body {
 .btn-success:hover {
     background-color: #3d6749;
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(74, 124, 89, 0.3);
+    box-shadow: 0 6px 20px rgba(74, 124, 89, 0.25);
 }
 
 .btn-warning {
@@ -146,9 +185,21 @@ body {
     color: var(--phare-navy);
 }
 
+.btn-warning:hover {
+    filter: brightness(0.98);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(212, 165, 116, 0.25);
+}
+
 .btn-danger {
     background-color: var(--phare-danger);
     color: var(--phare-white);
+}
+
+.btn-danger:hover {
+    filter: brightness(0.98);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(166, 75, 75, 0.25);
 }
 
 .btn-light {
@@ -157,43 +208,100 @@ body {
     border: 1px solid var(--phare-sand);
 }
 
+/* Boutons outline (utilisés sur dashboard/hebergements) */
+.btn-outline-secondary {
+    border: 2px solid var(--phare-sand) !important;
+    color: var(--phare-navy) !important;
+    background: var(--phare-white) !important;
+}
+
+.btn-outline-secondary:hover {
+    background: var(--phare-beige) !important;
+    transform: translateY(-1px);
+}
+
+.btn-outline-success {
+    border: 2px solid rgba(74, 124, 89, 0.35) !important;
+    color: var(--phare-success) !important;
+    background: var(--phare-white) !important;
+}
+
+.btn-outline-success:hover {
+    background: rgba(74, 124, 89, 0.10) !important;
+    transform: translateY(-1px);
+}
+
+.btn-outline-warning {
+    border: 2px solid rgba(212, 165, 116, 0.45) !important;
+    color: #8a5a21 !important;
+    background: var(--phare-white) !important;
+}
+
+.btn-outline-warning:hover {
+    background: rgba(212, 165, 116, 0.12) !important;
+    transform: translateY(-1px);
+}
+
+.btn-outline-danger {
+    border: 2px solid rgba(166, 75, 75, 0.40) !important;
+    color: var(--phare-danger) !important;
+    background: var(--phare-white) !important;
+}
+
+.btn-outline-danger:hover {
+    background: rgba(166, 75, 75, 0.12) !important;
+    transform: translateY(-1px);
+}
+
+/* Boutons petits */
+.btn-sm {
+    padding: 0.45rem 0.9rem;
+    font-size: 0.8rem;
+}
+
 /* ============ CARDS ============ */
 
 .card {
-    border-radius: 12px;
+    border-radius: var(--phare-radius-lg);
     border: 1px solid var(--phare-sand);
-    box-shadow: 0 4px 12px rgba(26, 58, 82, 0.08);
-    transition: all 0.3s ease;
+    box-shadow: var(--phare-shadow-sm);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
     background-color: var(--phare-white);
     overflow: hidden;
 }
 
 .card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 24px rgba(26, 58, 82, 0.15);
+    transform: translateY(-4px);
+    box-shadow: var(--phare-shadow-md);
 }
 
+/* Cartes cliquables : un léger “glow” */
+a.text-decoration-none .card:hover {
+    border-color: rgba(201, 169, 97, 0.45);
+}
+
+/* Header de card */
 .card-header {
     background: linear-gradient(135deg, var(--phare-navy) 0%, var(--phare-blue) 100%);
     color: var(--phare-white);
     border-bottom: 3px solid var(--phare-gold);
-    padding: 1.2rem 1.5rem;
-    font-weight: 600;
+    padding: 1.1rem 1.4rem;
+    font-weight: 700;
 }
 
 .card-body {
-    padding: 1.5rem;
+    padding: 1.4rem;
 }
 
 .card-title {
     color: var(--phare-navy);
-    font-weight: 600;
-    margin-bottom: 1rem;
-    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 0.8rem;
+    font-size: 1.15rem;
 }
 
 .card-text {
-    color: #5a6c7d;
+    color: var(--phare-text-muted);
     line-height: 1.8;
 }
 
@@ -204,7 +312,7 @@ body {
 
 .card.text-center h2 {
     font-family: 'Playfair Display', serif;
-    font-weight: 700;
+    font-weight: 800;
     font-size: 3rem;
     margin: 0.5rem 0;
 }
@@ -227,15 +335,27 @@ body {
 
 /* Bordures colorées des cards hébergements */
 .card.border-success {
-    border-left: 5px solid var(--phare-success) !important;
+    border-left: 6px solid var(--phare-success) !important;
 }
 
 .card.border-warning {
-    border-left: 5px solid var(--phare-warning) !important;
+    border-left: 6px solid var(--phare-warning) !important;
 }
 
 .card.border-danger {
-    border-left: 5px solid var(--phare-danger) !important;
+    border-left: 6px solid var(--phare-danger) !important;
+}
+
+/* ============ PROGRESS (dashboard) ============ */
+
+.progress {
+    background-color: rgba(232, 220, 196, 0.55);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    background: linear-gradient(90deg, var(--phare-success) 0%, #69a06f 100%);
 }
 
 /* ============ BADGES ============ */
@@ -243,26 +363,9 @@ body {
 .badge {
     padding: 0.5em 1em;
     font-size: 0.85em;
-    font-weight: 500;
+    font-weight: 600;
     border-radius: 20px;
-    letter-spacing: 0.5px;
-}
-
-.badge.bg-success {
-    background-color: var(--phare-success) !important;
-}
-
-.badge.bg-warning {
-    background-color: var(--phare-warning) !important;
-    color: var(--phare-navy) !important;
-}
-
-.badge.bg-danger {
-    background-color: var(--phare-danger) !important;
-}
-
-.badge.bg-info {
-    background-color: var(--phare-blue) !important;
+    letter-spacing: 0.4px;
 }
 
 /* ============ TABLES ============ */
@@ -277,49 +380,61 @@ body {
     background: linear-gradient(135deg, var(--phare-navy) 0%, var(--phare-blue) 100%);
     color: var(--phare-white);
     border: none;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
-    font-size: 0.85rem;
-    letter-spacing: 0.5px;
+    font-size: 0.82rem;
+    letter-spacing: 0.6px;
     padding: 1rem;
 }
 
 .table tbody tr {
     border-bottom: 1px solid var(--phare-sand);
-    transition: background-color 0.2s ease;
+    transition: background-color 0.15s ease;
 }
 
 .table-hover tbody tr:hover {
-    background-color: var(--phare-beige);
+    background-color: rgba(245, 241, 232, 0.9);
 }
 
 .table td {
     padding: 1rem;
     vertical-align: middle;
+    color: var(--phare-navy);
 }
 
 /* ============ FORMULAIRES ============ */
 
 .form-control, .form-select {
     border: 2px solid var(--phare-sand);
-    border-radius: 6px;
+    border-radius: var(--phare-radius-sm);
     padding: 0.7rem 1rem;
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
     background-color: var(--phare-white);
     color: var(--phare-navy);
+}
+
+.form-control::placeholder {
+    color: rgba(26, 58, 82, 0.45);
 }
 
 .form-control:focus, .form-select:focus {
     border-color: var(--phare-blue);
-    box-shadow: 0 0 0 0.2rem rgba(44, 95, 124, 0.15);
+    box-shadow: var(--phare-focus);
     background-color: var(--phare-white);
 }
 
+.input-group-text {
+    background-color: var(--phare-white);
+    border: 2px solid var(--phare-sand);
+    border-right: none;
+    color: var(--phare-blue);
+}
+
 .form-label {
-    font-weight: 600;
+    font-weight: 700;
     color: var(--phare-navy);
     margin-bottom: 0.5rem;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -339,11 +454,11 @@ body {
 
 .form-check-input:focus {
     border-color: var(--phare-blue);
-    box-shadow: 0 0 0 0.2rem rgba(44, 95, 124, 0.15);
+    box-shadow: var(--phare-focus);
 }
 
 .form-check-label {
-    font-weight: 500;
+    font-weight: 600;
     color: var(--phare-navy);
     margin-left: 0.5rem;
 }
@@ -354,7 +469,7 @@ body {
     border-radius: 8px;
     border-left: 5px solid;
     padding: 1rem 1.5rem;
-    font-weight: 500;
+    font-weight: 600;
 }
 
 .alert-success {
@@ -396,7 +511,7 @@ body {
 
 .modal-title {
     font-family: 'Playfair Display', serif;
-    font-weight: 600;
+    font-weight: 700;
 }
 
 .modal-body {
@@ -415,7 +530,7 @@ body {
 .card-body h3 {
     font-family: 'Playfair Display', serif;
     color: var(--phare-navy);
-    font-weight: 700;
+    font-weight: 800;
     margin-bottom: 2rem;
 }
 
@@ -424,12 +539,12 @@ body {
 h1, h2, h3, h4, h5 {
     font-family: 'Playfair Display', serif;
     color: var(--phare-navy);
-    font-weight: 600;
+    font-weight: 700;
 }
 
 h2 {
-    margin-bottom: 1.5rem;
-    padding-bottom: 0.5rem;
+    margin-bottom: 1.2rem;
+    padding-bottom: 0.45rem;
     border-bottom: 2px solid var(--phare-gold);
     display: inline-block;
 }
@@ -445,7 +560,8 @@ h2 {
 .dropdown-item {
     color: var(--phare-navy);
     padding: 0.7rem 1.5rem;
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
+    font-weight: 600;
 }
 
 .dropdown-item:hover {
@@ -453,21 +569,52 @@ h2 {
     color: var(--phare-blue);
 }
 
+/* ============ PAGINATION ============ */
+
+.pagination .page-link {
+    border: 2px solid var(--phare-sand);
+    color: var(--phare-navy);
+    background: var(--phare-white);
+    font-weight: 700;
+    border-radius: 10px;
+    margin: 0 4px;
+}
+
+.pagination .page-link:hover {
+    background: var(--phare-beige);
+    color: var(--phare-blue);
+    transform: translateY(-1px);
+}
+
+.pagination .page-item.active .page-link {
+    background: linear-gradient(135deg, var(--phare-blue) 0%, var(--phare-navy) 100%);
+    border-color: transparent;
+    color: var(--phare-white);
+}
+
+.pagination .page-item.disabled .page-link {
+    opacity: 0.6;
+}
+
 /* ============ ANIMATIONS ============ */
 
 @keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
+/* Animation légère (peut être désactivée ci-dessous) */
 .card, .alert {
-    animation: fadeIn 0.4s ease-in;
+    animation: fadeIn 0.25s ease-in;
+}
+
+/* Respecte les préférences d’accessibilité */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        transition: none !important;
+        animation: none !important;
+        scroll-behavior: auto !important;
+    }
 }
 
 /* ============ RESPONSIVE ============ */
@@ -476,21 +623,25 @@ h2 {
     .navbar-brand {
         font-size: 1.1rem;
     }
-    
+
     .navbar-brand i {
         font-size: 1.4rem;
     }
-    
+
     .card {
         margin-bottom: 1rem;
     }
-    
+
     .table {
-        font-size: 0.85rem;
+        font-size: 0.88rem;
     }
-    
+
     h2 {
         font-size: 1.5rem;
+    }
+
+    .btn {
+        padding: 0.55rem 1rem;
     }
 }
 
@@ -498,12 +649,6 @@ h2 {
 
 .bi {
     vertical-align: -0.125em;
-}
-
-/* ============ FOOTER SPACING ============ */
-
-body {
-    padding-bottom: 3rem;
 }
 
 /* ============ CONTAINER ============ */
