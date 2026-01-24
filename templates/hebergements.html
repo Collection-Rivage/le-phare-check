@@ -2,162 +2,360 @@
 {% block title %}Hébergements{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-house-door"></i> Hébergements ({{ hebergements.total }} total)</h2>
-    {% if current_user.role == 'admin' %}
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
-        <i class="bi bi-plus-circle"></i> Ajouter
-    </button>
-    {% endif %}
+{% set q = request.args.get('q','') %}
+{% set statut = request.args.get('statut','') %}
+{% set type_id = request.args.get('type_id','') %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="mb-0"><i class="bi bi-house-door"></i> Hébergements</h2>
+    <div class="text-muted">
+      {{ hebergements.total }} résultat(s)
+      {% if q or statut or type_id %}
+        • filtres actifs
+      {% endif %}
+    </div>
+  </div>
+
+  {% if current_user.role == 'admin' %}
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
+    <i class="bi bi-plus-circle"></i> Ajouter
+  </button>
+  {% endif %}
 </div>
 
-<!-- Barre de recherche -->
-<div class="row mb-4">
-    <div class="col-md-6">
-        <div class="input-group">
-            <span class="input-group-text"><i class="bi bi-search"></i></span>
-            <input type="text" id="searchInput" class="form-control form-control-lg" placeholder="Rechercher (ex: 12, STAFF, Bien-Être, Cabane...)">
-        </div>
+<!-- Filtres (serveur, compatibles pagination) -->
+<form method="GET" action="{{ url_for('hebergements') }}" class="row g-2 mb-4">
+  <div class="col-md-6">
+    <div class="input-group">
+      <span class="input-group-text"><i class="bi bi-search"></i></span>
+      <input
+        type="text"
+        name="q"
+        class="form-control form-control-lg"
+        placeholder="Rechercher (ex: 12, STAFF, Bien-Être, Cabane...)"
+        value="{{ q }}"
+        id="qInput"
+      >
     </div>
+  </div>
+
+  <div class="col-md-3">
+    <select class="form-select form-select-lg" name="statut" id="statutSelect">
+      <option value="">Tous les statuts</option>
+      <option value="ok" {{ 'selected' if statut=='ok' else '' }}>OK</option>
+      <option value="alerte" {{ 'selected' if statut=='alerte' else '' }}>Alerte</option>
+      <option value="probleme" {{ 'selected' if statut=='probleme' else '' }}>Problème</option>
+    </select>
+  </div>
+
+  <div class="col-md-3">
+    <select class="form-select form-select-lg" name="type_id" id="typeSelect">
+      <option value="">Tous les types</option>
+      {% for t in types %}
+      <option value="{{ t.id }}" {{ 'selected' if type_id == (t.id|string) else '' }}>
+        {{ t.nom }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="col-12 d-flex gap-2">
+    <button class="btn btn-primary" type="submit">
+      <i class="bi bi-funnel"></i> Filtrer
+    </button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('hebergements') }}">
+      Réinitialiser
+    </a>
+
+    <div class="ms-auto d-flex gap-2">
+      <a class="btn btn-outline-danger" href="{{ url_for('hebergements', statut='probleme', q=q, type_id=type_id) }}">
+        <i class="bi bi-exclamation-octagon"></i> Problèmes
+      </a>
+      <a class="btn btn-outline-warning" href="{{ url_for('hebergements', statut='alerte', q=q, type_id=type_id) }}">
+        <i class="bi bi-exclamation-triangle"></i> Alertes
+      </a>
+      <a class="btn btn-outline-success" href="{{ url_for('hebergements', statut='ok', q=q, type_id=type_id) }}">
+        <i class="bi bi-check2-circle"></i> OK
+      </a>
+    </div>
+  </div>
+</form>
+
+{% if hebergements.total == 0 %}
+<div class="text-center mt-5">
+  <i class="bi bi-search" style="font-size: 4rem; color: #ccc;"></i>
+  <h4 class="mt-3 text-muted">Aucun hébergement trouvé</h4>
+  <p class="text-muted">Essaie un autre terme ou enlève des filtres.</p>
 </div>
+{% else %}
 
 <!-- Liste des hébergements -->
-<div class="row" id="hebergementsContainer">
-    {% for heb in hebergements.items %}
-    <div class="col-md-4 mb-3 hebergement-item" data-emplacement="{{ heb.emplacement }}" data-type="{{ heb.type_hebergement.nom }}">
-        <div class="card h-100 {% if heb.statut == 'probleme' %}border-danger{% elif heb.statut == 'alerte' %}border-warning{% else %}border-success{% endif %}">
-            <div class="card-body">
-                <h5 class="card-title">{{ heb.emplacement }}</h5>
-                <p class="card-text">
-                    <strong>Type :</strong> {{ heb.type_hebergement.nom }}<br>
-                    <strong>N° Châssis :</strong> {{ heb.numero_chassis or 'N/A' }}<br>
-                    <strong>Capacité :</strong> {{ heb.nb_personnes or 'N/A' }} pers.<br>
-                    <strong>Compteur eau :</strong> {{ heb.compteur_eau.replace('_', ' ').title() if heb.compteur_eau else 'N/A' }}
-                </p>
-                
-                <div class="mb-2">
-                    {% if heb.statut == 'ok' %}
-                    <span class="badge bg-success">OK</span>
-                    {% elif heb.statut == 'alerte' %}
-                    <span class="badge bg-warning">Alerte</span>
-                    {% else %}
-                    <span class="badge bg-danger">Problème</span>
-                    {% endif %}
-                </div>
-                
-                <div class="d-grid gap-2">
-                    <a href="{{ url_for('check', hebergement_id=heb.id) }}" class="btn btn-primary btn-sm">
-                        <i class="bi bi-clipboard-check"></i> Faire un check
-                    </a>
-                    <a href="{{ url_for('signaler_incident', hebergement_id=heb.id) }}" class="btn btn-danger btn-sm">
-                        <i class="bi bi-exclamation-triangle-fill"></i> Signaler un problème
-                    </a>
-                </div>
-                
-                {% if current_user.role == 'admin' %}
-                <div class="mt-2">
-                    <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#editModal{{ heb.id }}">
-                        <i class="bi bi-pencil"></i>
-                    </button>
-                    {% if heb.checks|length == 0 and heb.incidents|length == 0 %}
-                    <a href="{{ url_for('delete_hebergement', id=heb.id) }}" class="btn btn-danger btn-sm" onclick="return confirm('Supprimer cet hébergement ?')">
-                        <i class="bi bi-trash"></i>
-                    </a>
-                    {% else %}
-                    <button class="btn btn-danger btn-sm" disabled title="Des checks ou incidents sont liés">
-                        <i class="bi bi-trash"></i>
-                    </button>
-                    {% endif %}
-                </div>
-                {% endif %}
-            </div>
+<div class="row">
+  {% for heb, check_count, last_check_at, incident_count in hebergements.items %}
+  {% set check_count = check_count or 0 %}
+  {% set incident_count = incident_count or 0 %}
+
+  <div class="col-md-4 mb-3">
+    <div class="card h-100 shadow-sm
+      {% if heb.statut == 'probleme' %}border-danger
+      {% elif heb.statut == 'alerte' %}border-warning
+      {% else %}border-success{% endif %}">
+      <div class="card-body d-flex flex-column">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <h5 class="card-title mb-0">{{ heb.emplacement }}</h5>
+
+          {% if heb.statut == 'ok' %}
+          <span class="badge bg-success">OK</span>
+          {% elif heb.statut == 'alerte' %}
+          <span class="badge bg-warning text-dark">Alerte</span>
+          {% else %}
+          <span class="badge bg-danger">Problème</span>
+          {% endif %}
         </div>
+
+        <div class="text-muted small mb-2">
+          <div><strong>Type :</strong> {{ heb.type_hebergement.nom }}</div>
+          <div><strong>N° Châssis :</strong> {{ heb.numero_chassis or 'N/A' }}</div>
+          <div><strong>Capacité :</strong> {{ heb.nb_personnes or 'N/A' }} pers.</div>
+          <div><strong>Compteur eau :</strong>
+            {{ heb.compteur_eau.replace('_', ' ').title() if heb.compteur_eau else 'N/A' }}
+          </div>
+        </div>
+
+        <div class="small mb-3">
+          <div class="text-muted">
+            <i class="bi bi-clipboard-check"></i>
+            Checks : <strong>{{ check_count }}</strong>
+            •
+            <i class="bi bi-exclamation-triangle"></i>
+            Incidents : <strong>{{ incident_count }}</strong>
+          </div>
+          <div class="text-muted">
+            <i class="bi bi-clock"></i>
+            Dernier check :
+            {% if last_check_at %}
+              <strong>{{ last_check_at.strftime('%d/%m/%Y %H:%M') }}</strong>
+            {% else %}
+              <span class="text-muted">Jamais</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="mt-auto d-grid gap-2">
+          <a href="{{ url_for('check', hebergement_id=heb.id) }}" class="btn btn-primary btn-sm">
+            <i class="bi bi-clipboard-check"></i> Faire un check
+          </a>
+          <a href="{{ url_for('signaler_incident', hebergement_id=heb.id) }}" class="btn btn-danger btn-sm">
+            <i class="bi bi-exclamation-triangle-fill"></i> Signaler un problème
+          </a>
+        </div>
+
+        {% if current_user.role == 'admin' %}
+        <div class="mt-2 d-flex gap-2">
+          <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#editModal{{ heb.id }}">
+            <i class="bi bi-pencil"></i>
+          </button>
+
+          {% if check_count == 0 and incident_count == 0 %}
+          <a href="{{ url_for('delete_hebergement', id=heb.id) }}"
+             class="btn btn-danger btn-sm"
+             onclick="return confirm('Supprimer cet hébergement ?')">
+            <i class="bi bi-trash"></i>
+          </a>
+          {% else %}
+          <button class="btn btn-danger btn-sm" disabled title="Des checks ou incidents sont liés">
+            <i class="bi bi-trash"></i>
+          </button>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
     </div>
-    {% endfor %}
+  </div>
+  {% endfor %}
 </div>
+{% endif %}
 
-<!-- Message quand aucun résultat -->
-<div id="noResults" class="text-center mt-5" style="display: none;">
-    <i class="bi bi-search" style="font-size: 4rem; color: #ccc;"></i>
-    <h4 class="mt-3 text-muted">Aucun hébergement trouvé</h4>
-    <p class="text-muted">Essaie avec un autre terme</p>
-</div>
-
-<!-- Pagination -->
+<!-- Pagination (conserve les filtres) -->
 {% if hebergements.pages > 1 %}
 <nav aria-label="Navigation pages hébergements" class="mt-5">
-    <ul class="pagination justify-content-center">
-        {% if hebergements.has_prev %}
-        <li class="page-item">
-            <a class="page-link" href="{{ url_for('hebergements', page=hebergements.prev_num) }}">
-                <i class="bi bi-chevron-left"></i> Précédente
-            </a>
+  <ul class="pagination justify-content-center">
+
+    {% if hebergements.has_prev %}
+    <li class="page-item">
+      <a class="page-link" href="{{ url_for('hebergements',
+        page=hebergements.prev_num, q=q, statut=statut, type_id=type_id) }}">
+        <i class="bi bi-chevron-left"></i> Précédente
+      </a>
+    </li>
+    {% else %}
+    <li class="page-item disabled">
+      <span class="page-link"><i class="bi bi-chevron-left"></i> Précédente</span>
+    </li>
+    {% endif %}
+
+    {% for page_num in hebergements.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+      {% if page_num %}
+        {% if hebergements.page == page_num %}
+        <li class="page-item active" aria-current="page">
+          <span class="page-link">{{ page_num }}</span>
         </li>
         {% else %}
-        <li class="page-item disabled">
-            <span class="page-link"><i class="bi bi-chevron-left"></i> Précédente</span>
-        </li>
-        {% endif %}
-
-        {% for page_num in hebergements.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
-            {% if page_num %}
-                {% if hebergements.page == page_num %}
-                <li class="page-item active" aria-current="page">
-                    <span class="page-link">{{ page_num }}</span>
-                </li>
-                {% else %}
-                <li class="page-item">
-                    <a class="page-link" href="{{ url_for('hebergements', page=page_num) }}">{{ page_num }}</a>
-                </li>
-                {% endif %}
-            {% else %}
-            <li class="page-item disabled"><span class="page-link">...</span></li>
-            {% endif %}
-        {% endfor %}
-
-        {% if hebergements.has_next %}
         <li class="page-item">
-            <a class="page-link" href="{{ url_for('hebergements', page=hebergements.next_num) }}">
-                Suivante <i class="bi bi-chevron-right"></i>
-            </a>
-        </li>
-        {% else %}
-        <li class="page-item disabled">
-            <span class="page-link">Suivante <i class="bi bi-chevron-right"></i></span>
+          <a class="page-link" href="{{ url_for('hebergements',
+            page=page_num, q=q, statut=statut, type_id=type_id) }}">{{ page_num }}</a>
         </li>
         {% endif %}
-    </ul>
-    <p class="text-center text-muted mt-2">
-        Page {{ hebergements.page }} sur {{ hebergements.pages }} | {{ hebergements.total }} hébergements
-    </p>
+      {% else %}
+      <li class="page-item disabled"><span class="page-link">...</span></li>
+      {% endif %}
+    {% endfor %}
+
+    {% if hebergements.has_next %}
+    <li class="page-item">
+      <a class="page-link" href="{{ url_for('hebergements',
+        page=hebergements.next_num, q=q, statut=statut, type_id=type_id) }}">
+        Suivante <i class="bi bi-chevron-right"></i>
+      </a>
+    </li>
+    {% else %}
+    <li class="page-item disabled">
+      <span class="page-link">Suivante <i class="bi bi-chevron-right"></i></span>
+    </li>
+    {% endif %}
+  </ul>
+
+  <p class="text-center text-muted mt-2">
+    Page {{ hebergements.page }} sur {{ hebergements.pages }} | {{ hebergements.total }} hébergements
+  </p>
 </nav>
 {% endif %}
 
+<!-- Auto-submit léger (optionnel) : tape -> filtre après 400ms + select change -->
 <script>
-// Recherche en temps réel
-document.getElementById('searchInput').addEventListener('input', function(e) {
-    const searchTerm = e.target.value.toLowerCase().trim();
-    const items = document.querySelectorAll('.hebergement-item');
-    let visibleCount = 0;
+(function () {
+  const form = document.querySelector('form[action="{{ url_for("hebergements") }}"]');
+  if (!form) return;
 
-    items.forEach(item => {
-        const emplacement = item.dataset.emplacement.toLowerCase();
-        const type = item.dataset.type.toLowerCase();
-        
-        if (emplacement.includes(searchTerm) || type.includes(searchTerm)) {
-            item.style.display = '';
-            visibleCount++;
-        } else {
-            item.style.display = 'none';
-        }
+  let t = null;
+  const qInput = document.getElementById('qInput');
+  const statutSelect = document.getElementById('statutSelect');
+  const typeSelect = document.getElementById('typeSelect');
+
+  if (qInput) {
+    qInput.addEventListener('input', function () {
+      clearTimeout(t);
+      t = setTimeout(() => form.submit(), 400);
     });
-
-    document.getElementById('noResults').style.display = visibleCount === 0 ? 'block' : 'none';
-});
+  }
+  if (statutSelect) statutSelect.addEventListener('change', () => form.submit());
+  if (typeSelect) typeSelect.addEventListener('change', () => form.submit());
+})();
 </script>
 
-<!-- Modals d'ajout et d'édition (ton code existant) -->
+<!-- ===================== MODALS ADMIN (complets) ===================== -->
 {% if current_user.role == 'admin' %}
-<!-- Tu gardes tes modales d'ajout et d'édition ici -->
+
+<!-- Modal Ajout -->
+<div class="modal fade" id="addModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('add_hebergement') }}">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Ajouter un hébergement</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Emplacement</label>
+              <input class="form-control" name="emplacement" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Type</label>
+              <select class="form-select" name="type_id" required>
+                {% for t in types %}
+                <option value="{{ t.id }}">{{ t.nom }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">N° Châssis</label>
+              <input class="form-control" name="numero_chassis">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Capacité</label>
+              <input class="form-control" name="nb_personnes" type="number" min="0">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Compteur eau</label>
+              <input class="form-control" name="compteur_eau" placeholder="devant_droite">
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">Annuler</button>
+          <button class="btn btn-primary" type="submit">Ajouter</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modals Edition (1 par hébergement) -->
+{% for heb, check_count, last_check_at, incident_count in hebergements.items %}
+<div class="modal fade" id="editModal{{ heb.id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('edit_hebergement', id=heb.id) }}">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-pencil"></i> Modifier {{ heb.emplacement }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Emplacement</label>
+              <input class="form-control" name="emplacement" value="{{ heb.emplacement }}" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Type</label>
+              <select class="form-select" name="type_id" required>
+                {% for t in types %}
+                <option value="{{ t.id }}" {{ 'selected' if heb.type_id == t.id else '' }}>{{ t.nom }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">N° Châssis</label>
+              <input class="form-control" name="numero_chassis" value="{{ heb.numero_chassis or '' }}">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Capacité</label>
+              <input class="form-control" name="nb_personnes" type="number" min="0" value="{{ heb.nb_personnes or '' }}">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Compteur eau</label>
+              <input class="form-control" name="compteur_eau" value="{{ heb.compteur_eau or '' }}">
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">Annuler</button>
+          <button class="btn btn-primary" type="submit">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
 {% endif %}
 {% endblock %}
