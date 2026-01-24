@@ -3,93 +3,134 @@
 {% block title %}Tableau de bord - Le Phare Check{% endblock %}
 
 {% block content %}
-<h2><i class="bi bi-speedometer2"></i> Tableau de bord</h2>
+<div class="d-flex justify-content-between align-items-center">
+  <h2 class="mb-0"><i class="bi bi-speedometer2"></i> Tableau de bord</h2>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-danger" href="{{ url_for('hebergements', statut='probleme') }}">
+      <i class="bi bi-exclamation-octagon"></i> Problèmes
+    </a>
+    <a class="btn btn-outline-warning" href="{{ url_for('hebergements', statut='alerte') }}">
+      <i class="bi bi-exclamation-triangle"></i> Alertes
+    </a>
+  </div>
+</div>
 
-<!-- Statistiques -->
-<div class="row mt-4">
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <h5 class="card-title">Total</h5>
-                <h2 class="text-primary">{{ total }}</h2>
-                <p class="text-muted">Hébergements</p>
-            </div>
+<!-- Statistiques (cartes cliquables) -->
+<div class="row mt-4 g-3">
+  <div class="col-md-3">
+    <a class="text-decoration-none" href="{{ url_for('hebergements') }}">
+      <div class="card text-center h-100 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Total</h5>
+          <h2 class="text-primary">{{ total }}</h2>
+          <p class="text-muted mb-0">Hébergements</p>
         </div>
-    </div>
-    
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <h5 class="card-title">OK</h5>
-                <h2 class="text-success">{{ ok }}</h2>
-                <p class="text-muted">Aucun problème</p>
-            </div>
+      </div>
+    </a>
+  </div>
+
+  <div class="col-md-3">
+    <a class="text-decoration-none" href="{{ url_for('hebergements', statut='ok') }}">
+      <div class="card text-center h-100 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">OK</h5>
+          <h2 class="text-success">{{ ok }}</h2>
+          <p class="text-muted mb-0">Aucun problème</p>
         </div>
-    </div>
-    
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <h5 class="card-title">Alerte</h5>
-                <h2 class="text-warning">{{ alerte }}</h2>
-                <p class="text-muted">À surveiller</p>
-            </div>
+      </div>
+    </a>
+  </div>
+
+  <div class="col-md-3">
+    <a class="text-decoration-none" href="{{ url_for('hebergements', statut='alerte') }}">
+      <div class="card text-center h-100 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Alerte</h5>
+          <h2 class="text-warning">{{ alerte }}</h2>
+          <p class="text-muted mb-0">À surveiller</p>
         </div>
-    </div>
-    
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <h5 class="card-title">Problème</h5>
-                <h2 class="text-danger">{{ probleme }}</h2>
-                <p class="text-muted">Intervention requise</p>
-            </div>
+      </div>
+    </a>
+  </div>
+
+  <div class="col-md-3">
+    <a class="text-decoration-none" href="{{ url_for('hebergements', statut='probleme') }}">
+      <div class="card text-center h-100 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Problème</h5>
+          <h2 class="text-danger">{{ probleme }}</h2>
+          <p class="text-muted mb-0">Intervention requise</p>
         </div>
+      </div>
+    </a>
+  </div>
+</div>
+
+<!-- Taux OK -->
+<div class="card mt-4 shadow-sm">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center">
+      <strong>Taux OK</strong>
+      <span class="text-muted">{{ taux_ok }}%</span>
     </div>
+    <div class="progress mt-2" style="height: 10px;">
+      <div class="progress-bar bg-success" role="progressbar" style="width: {{ taux_ok }}%"></div>
+    </div>
+  </div>
 </div>
 
 <!-- Derniers checks -->
-<div class="card mt-4">
-    <div class="card-header">
-        <h5 class="mb-0"><i class="bi bi-clock-history"></i> Derniers checks</h5>
+<div class="card mt-4 shadow-sm">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h5 class="mb-0"><i class="bi bi-clock-history"></i> Derniers checks</h5>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('historique') }}">
+      Voir l’historique
+    </a>
+  </div>
+
+  <div class="card-body">
+    {% if derniers_checks %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Hébergement</th>
+            <th>Type</th>
+            <th>Technicien</th>
+            <th>Statut</th>
+            <th class="text-end">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for check in derniers_checks %}
+          <tr>
+            <td>{{ check.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+            <td><strong>{{ check.hebergement.emplacement }}</strong></td>
+            <td>{{ check.hebergement.type_hebergement.nom }}</td>
+            <td>{{ check.technicien.username }}</td>
+            <td>
+              {% if check.probleme_critique %}
+              <span class="badge bg-danger">Problème critique</span>
+              {% elif not (check.electricite and check.plomberie and check.chauffage and check.proprete and check.equipements) %}
+              <span class="badge bg-warning text-dark">Alerte</span>
+              {% else %}
+              <span class="badge bg-success">OK</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <a class="btn btn-sm btn-primary" href="{{ url_for('check', hebergement_id=check.hebergement.id) }}">
+                <i class="bi bi-clipboard-check"></i> Refaire
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
-    <div class="card-body">
-        {% if derniers_checks %}
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Hébergement</th>
-                        <th>Type</th>
-                        <th>Technicien</th>
-                        <th>Statut</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for check in derniers_checks %}
-                    <tr>
-                        <td>{{ check.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
-                        <td>{{ check.hebergement.emplacement }}</td>
-                        <td>{{ check.hebergement.type_hebergement.nom }}</td>
-                        <td>{{ check.technicien.username }}</td>
-                        <td>
-                            {% if check.probleme_critique %}
-                            <span class="badge bg-danger">Problème critique</span>
-                            {% elif not (check.electricite and check.plomberie and check.chauffage and check.proprete and check.equipements) %}
-                            <span class="badge bg-warning">Alerte</span>
-                            {% else %}
-                            <span class="badge bg-success">OK</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <p class="text-muted text-center">Aucun check effectué pour le moment</p>
-        {% endif %}
-    </div>
+    {% else %}
+    <p class="text-muted text-center mb-0">Aucun check effectué pour le moment</p>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}
