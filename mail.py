@@ -5,12 +5,8 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask import current_app
 
-# Initialisation pour ne pas casser app.py
-from flask_mail import Mail
-mail = Mail()
-
 def send_async_email(smtp_config, msg_data):
-    """Envoi direct via smtplib (plus rapide et stable sur Render)"""
+    """Envoi direct via smtplib avec support SSL/TLS automatique"""
     try:
         message = MIMEMultipart()
         message["From"] = smtp_config['sender']
@@ -18,29 +14,37 @@ def send_async_email(smtp_config, msg_data):
         message["Subject"] = msg_data['subject']
         message.attach(MIMEText(msg_data['body'], "plain"))
 
-        with smtplib.SMTP(smtp_config['server'], smtp_config['port'], timeout=15) as server:
+        # Log de debug pour voir quel port est utilisé
+        print(f"DEBUG: Tentative via port {smtp_config['port']}")
+
+        # Si on utilise le port 465, on doit utiliser SMTP_SSL
+        if smtp_config['port'] == 465:
+            server = smtplib.SMTP_SSL(smtp_config['server'], smtp_config['port'], timeout=15)
+        else:
+            server = smtplib.SMTP(smtp_config['server'], smtp_config['port'], timeout=15)
             server.starttls()
-            server.login(smtp_config['user'], smtp_config['password'])
-            server.sendmail(smtp_config['sender'], msg_data['to'], message.as_string())
+
+        server.login(smtp_config['user'], smtp_config['password'])
+        server.sendmail(smtp_config['sender'], msg_data['to'], message.as_string())
+        server.quit()
         
-        print(f"📩 [MAIL SUCCESS] Envoyé à {msg_data['to']}")
+        print(f"📩 [MAIL SUCCESS] Email envoyé à {msg_data['to']}")
     except Exception as e:
-        print(f"❌ [MAIL ERROR] Échec : {str(e)}")
+        print(f"❌ [MAIL ERROR] Erreur sur Render : {str(e)}")
 
 def send_welcome_email(user, password):
-    # Récupération des données depuis les variables Render (image)
     smtp_config = {
         'server': os.getenv('MAIL_SERVER', 'smtp.gmail.com'),
-        'port': int(os.getenv('MAIL_PORT', 587)),
+        'port': int(os.getenv('MAIL_PORT', 465)),
         'user': os.getenv('MAIL_USERNAME'),
         'password': os.getenv('MAIL_PASSWORD'),
-        'sender': os.getenv('MAIL_DEFAULT_SENDER') # Attention au R final
+        'sender': os.getenv('MAIL_DEFAULT_SENDER')
     }
 
     msg_data = {
         'to': user.email,
-        'subject': "✅ Votre compte Le Phare Check",
-        'body': f"Bonjour {user.username},\n\nVotre compte a été créé.\nUtilisateur : {user.username}\nMot de passe : {password}"
+        'subject': "✅ Bienvenue sur Le Phare Check",
+        'body': f"Bonjour {user.username},\n\nVotre compte est prêt.\nIdentifiants : {user.username} / {password}"
     }
 
     threading.Thread(target=send_async_email, args=(smtp_config, msg_data)).start()
@@ -49,7 +53,7 @@ def send_welcome_email(user, password):
 def send_assignment_email(incident, technician):
     smtp_config = {
         'server': os.getenv('MAIL_SERVER', 'smtp.gmail.com'),
-        'port': int(os.getenv('MAIL_PORT', 587)),
+        'port': int(os.getenv('MAIL_PORT', 465)),
         'user': os.getenv('MAIL_USERNAME'),
         'password': os.getenv('MAIL_PASSWORD'),
         'sender': os.getenv('MAIL_DEFAULT_SENDER')
