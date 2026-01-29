@@ -1,14 +1,16 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from markupsafe import Markup
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from markupsafe import Markup
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from config import Config
 from models import db, User, Hebergement, Check, TypeHebergement, Incident
-from flask_mail import Mail  # ← ajouté
-from mail import send_welcome_email, send_assignment_email  # ← ajouté
+
+from flask_mail import Mail
+from mail import send_welcome_email, send_assignment_email, mail as mail_extension
 
 from sqlalchemy.orm import selectinload
 from sqlalchemy import case, cast, Integer, func, or_
-
 import os
 import random
 import string
@@ -17,7 +19,11 @@ app = Flask(__name__)
 app.config.from_object(Config)
 
 db.init_app(app)
-mail = Mail(app)                    # ← LIGNE AJOUTÉE (indispensable)
+
+# Initialisation de Flask-Mail
+mail = Mail(app)
+mail_extension.init_app(app)
+
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
