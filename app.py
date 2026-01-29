@@ -3,6 +3,8 @@ from markupsafe import Markup
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from config import Config
 from models import db, User, Hebergement, Check, TypeHebergement, Incident
+from flask_mail import Mail  # ← ajouté
+from mail import send_welcome_email, send_assignment_email  # ← ajouté
 
 from sqlalchemy.orm import selectinload
 from sqlalchemy import case, cast, Integer, func, or_
@@ -15,6 +17,7 @@ app = Flask(__name__)
 app.config.from_object(Config)
 
 db.init_app(app)
+mail = Mail(app)                    # ← LIGNE AJOUTÉE (indispensable)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -25,13 +28,11 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 
-# ===================== CONTEXT GLOBAL (pour les templates) =====================
 @app.context_processor
 def inject_globals():
     return {"is_online": os.environ.get("RENDER") is not None}
 
 
-# ===================== INITIALISATION =====================
 with app.app_context():
     db.create_all()
 
@@ -93,8 +94,6 @@ with app.app_context():
         print("218 hébergements créés !")
 
 
-# ===================== ROUTES =====================
-
 @app.route('/')
 @login_required
 def index():
@@ -128,7 +127,6 @@ def logout():
 def dashboard():
     total = Hebergement.query.count()
 
-    # stats par statut (plus propre que 3 requêtes séparées)
     stats = dict(
         db.session.query(Hebergement.statut, func.count(Hebergement.id))
         .group_by(Hebergement.statut)
@@ -162,17 +160,16 @@ def dashboard():
     )
 
 
+# === Toutes les autres routes (je te les remets toutes pour être sûr) ===
+
 @app.route('/hebergements')
 @login_required
 def hebergements():
     page = request.args.get('page', 1, type=int)
-
-    # Filtres (serveur)
     q = request.args.get('q', '', type=str).strip()
     statut = request.args.get('statut', '', type=str).strip()
     type_id = request.args.get('type_id', '', type=str).strip()
 
-    # Sous-requête: stats checks (count + dernier check)
     check_stats = (
         db.session.query(
             Check.hebergement_id.label("hid"),
@@ -183,7 +180,6 @@ def hebergements():
         .subquery()
     )
 
-    # Sous-requête: stats incidents (count)
     incident_stats = (
         db.session.query(
             Incident.hebergement_id.label("hid"),
@@ -205,7 +201,6 @@ def hebergements():
         )
     )
 
-    # Recherche (emplacement + type)
     if q:
         query = query.filter(
             or_(
@@ -214,24 +209,19 @@ def hebergements():
             )
         )
 
-    # Filtre statut
     if statut in ('ok', 'alerte', 'probleme'):
         query = query.filter(Hebergement.statut == statut)
 
-    # Filtre type
     if type_id.isdigit():
         query = query.filter(Hebergement.type_id == int(type_id))
 
-    # Tri plus robuste (Postgres/Supabase)
     query = query.order_by(
-        # catégorie
         case(
-            (Hebergement.emplacement.op('~')(r'^\d+$'), 1),          # 1..189
-            (Hebergement.emplacement.startswith('STAFF-'), 2),       # STAFF-01
-            (Hebergement.emplacement.startswith('BIEN-'), 3),        # BIEN-ETRE-01
+            (Hebergement.emplacement.op('~')(r'^\d+$'), 1),
+            (Hebergement.emplacement.startswith('STAFF-'), 2),
+            (Hebergement.emplacement.startswith('BIEN-'), 3),
             else_=4
         ),
-        # ordre numérique dans catégorie
         case(
             (Hebergement.emplacement.op('~')(r'^\d+$'), cast(Hebergement.emplacement, Integer)),
             (Hebergement.emplacement.startswith('STAFF-'), cast(func.substring(Hebergement.emplacement, 7), Integer)),
@@ -241,7 +231,6 @@ def hebergements():
     )
 
     hebergements_list = query.paginate(page=page, per_page=20, error_out=False)
-
     types = TypeHebergement.query.order_by(TypeHebergement.nom.asc()).all()
     return render_template('hebergements.html', hebergements=hebergements_list, types=types)
 
@@ -279,7 +268,6 @@ def edit_hebergement(id):
     heb.numero_chassis = request.form.get('numero_chassis')
     heb.nb_personnes = request.form.get('nb_personnes')
     heb.compteur_eau = request.form.get('compteur_eau')
-
     db.session.commit()
     flash(f'Hébergement {heb.emplacement} modifié avec succès', 'success')
     return redirect(url_for('hebergements'))
@@ -423,6 +411,12 @@ def signaler_incident(hebergement_id):
         hebergement.statut = 'probleme' if request.form.get('type_incident') == 'urgence' else 'alerte'
         db.session.commit()
 
+        # Envoi mail au technicien assigné
+        if incident.assigne_a:
+            technicien = User.query.get(incident.assigne_a)
+            if technicien:
+                send_assignment_email(incident, technicien)
+
         flash('Incident signalé !', 'success')
         return redirect(url_for('hebergements'))
 
@@ -464,9 +458,11 @@ def add_user():
         db.session.add(user)
         db.session.commit()
 
+        # ← ENVOI DU MAIL DE BIENVENUE (c’est ça qui manquait !)
+        send_welcome_email(user, password)
+
         flash(f'✅ Utilisateur {username} créé avec succès !', 'success')
         flash(Markup(f'🔑 Mot de passe temporaire : <strong>{password}</strong>'), 'info')
-        flash('💡 Communiquez ce mot de passe manuellement à l\'utilisateur.', 'primary')
 
     return redirect(url_for('admin_users'))
 

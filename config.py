@@ -10,8 +10,11 @@ class Config:
     database_url = os.environ.get('DATABASE_URL')
     
     if database_url:
-        # Render utilise déjà postgresql://, pas besoin de convertir
-        SQLALCHEMY_DATABASE_URI = database_url
+        # Convertir pour utiliser pg8000 (compatible Windows)
+        if database_url.startswith('postgresql://'):
+            SQLALCHEMY_DATABASE_URI = database_url.replace('postgresql://', 'postgresql+pg8000://', 1)
+        else:
+            SQLALCHEMY_DATABASE_URI = database_url
     else:
         SQLALCHEMY_DATABASE_URI = 'sqlite:///lephare.db'
     

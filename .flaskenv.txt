@@ -1,0 +1,9 @@
+# Database Supabase (à remplacer par vos identifiants)
+DATABASE_URL=postgresql://votre_user:votre_mot_de_passe@aws-0-region.pooler.supabase.com:5432/postgres
+
+# Secret key (changez cette valeur en production)
+SECRET_KEY=une_phrase_très_secrète_à_changer
+
+# Configuration Brevo (optionnel pour les mails)
+MAIL_USERNAME=votre_api_key_brevo
+MAIL_PASSWORD=votre_secret_brevo
