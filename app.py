@@ -1,13 +1,11 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from markupsafe import Markup
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
-from markupsafe import Markup
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from config import Config
 from models import db, User, Hebergement, Check, TypeHebergement, Incident
 
-from flask_mail import Mail
-from mail import send_welcome_email, send_assignment_email, mail as mail_extension
+# IMPORTATION CORRIGÉE
+from mail import mail, send_welcome_email, send_assignment_email
 
 from sqlalchemy.orm import selectinload
 from sqlalchemy import case, cast, Integer, func, or_
@@ -18,20 +16,17 @@ import string
 app = Flask(__name__)
 app.config.from_object(Config)
 
+# ===================== INITIALISATION =====================
 db.init_app(app)
-
-# Initialisation de Flask-Mail
-mail = Mail(app)
-mail_extension.init_app(app)
+mail.init_app(app) # <--- Liaison avec l'app
 
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 
 @app.context_processor
