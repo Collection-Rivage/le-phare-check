@@ -1,69 +1,65 @@
-from flask_mail import Mail, Message
+import smtplib
+import threading
+import os
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from flask import current_app
 
-# L'objet mail sera initialisé dans app.py via mail_extension.init_app(app)
+# Initialisation pour ne pas casser app.py
+from flask_mail import Mail
 mail = Mail()
 
+def send_async_email(smtp_config, msg_data):
+    """Envoi direct via smtplib (plus rapide et stable sur Render)"""
+    try:
+        message = MIMEMultipart()
+        message["From"] = smtp_config['sender']
+        message["To"] = msg_data['to']
+        message["Subject"] = msg_data['subject']
+        message.attach(MIMEText(msg_data['body'], "plain"))
+
+        with smtplib.SMTP(smtp_config['server'], smtp_config['port'], timeout=15) as server:
+            server.starttls()
+            server.login(smtp_config['user'], smtp_config['password'])
+            server.sendmail(smtp_config['sender'], msg_data['to'], message.as_string())
+        
+        print(f"📩 [MAIL SUCCESS] Envoyé à {msg_data['to']}")
+    except Exception as e:
+        print(f"❌ [MAIL ERROR] Échec : {str(e)}")
 
 def send_welcome_email(user, password):
-    """Envoie le mail de bienvenue lors de la création d'un compte"""
+    # Récupération des données depuis les variables Render (image)
+    smtp_config = {
+        'server': os.getenv('MAIL_SERVER', 'smtp.gmail.com'),
+        'port': int(os.getenv('MAIL_PORT', 587)),
+        'user': os.getenv('MAIL_USERNAME'),
+        'password': os.getenv('MAIL_PASSWORD'),
+        'sender': os.getenv('MAIL_DEFAULT_SENDER') # Attention au R final
+    }
 
-    # Logs utiles (surtout pour Render)
-    print(f"[MAIL] Préparation mail de bienvenue pour {user.email}")
-    print(f"[MAIL] SERVER={current_app.config.get('MAIL_SERVER')}")
-    print(f"[MAIL] PORT={current_app.config.get('MAIL_PORT')}")
-    print(f"[MAIL] USERNAME={current_app.config.get('MAIL_USERNAME')}")
-    print(f"[MAIL] DEFAULT_SENDER={current_app.config.get('MAIL_DEFAULT_SENDER')}")
-    print(f"[MAIL] APP_URL={current_app.config.get('APP_URL')}")
+    msg_data = {
+        'to': user.email,
+        'subject': "✅ Votre compte Le Phare Check",
+        'body': f"Bonjour {user.username},\n\nVotre compte a été créé.\nUtilisateur : {user.username}\nMot de passe : {password}"
+    }
 
-    msg = Message(
-        subject="✅ Votre compte Le Phare Check",
-        recipients=[user.email],
-        body=f"""Bonjour {user.username},
-
-Votre compte sur l'application Le Phare Check a été créé avec succès !
-
-👤 Utilisateur : {user.username}
-🔑 Mot de passe : {password}
-
-Lien : {current_app.config.get('APP_URL', 'https://le-phare-check.onrender.com')}
-""",
-        sender=current_app.config['MAIL_DEFAULT_SENDER'],
-    )
-
-    try:
-        print("[MAIL] Envoi du message via Flask-Mail...")
-        mail.send(msg)
-        print(f"📩 Mail de bienvenue envoyé à {user.email}")
-        return True
-    except Exception as e:
-        print(f"❌ Erreur envoi bienvenue : {e!r}")
-        return False
-
+    threading.Thread(target=send_async_email, args=(smtp_config, msg_data)).start()
+    return True
 
 def send_assignment_email(incident, technician):
-    """Envoie une notification au technicien quand un incident lui est assigné"""
+    smtp_config = {
+        'server': os.getenv('MAIL_SERVER', 'smtp.gmail.com'),
+        'port': int(os.getenv('MAIL_PORT', 587)),
+        'user': os.getenv('MAIL_USERNAME'),
+        'password': os.getenv('MAIL_PASSWORD'),
+        'sender': os.getenv('MAIL_DEFAULT_SENDER')
+    }
 
-    print(f"[MAIL] Préparation mail d'assignation pour {technician.email}")
+    msg_data = {
+        'to': technician.email,
+        'subject': "🔔 Nouvel incident assigné",
+        'body': f"Bonjour {technician.username},\n\nUn incident vous a été assigné à {incident.hebergement.emplacement}."
+    }
 
-    msg = Message(
-        subject="🔔 Nouvel incident assigné - Le Phare Check",
-        recipients=[technician.email],
-        body=f"""Bonjour {technician.username},
-
-Un incident vous a été assigné :
-🏠 Lieu : {incident.hebergement.emplacement}
-⚠️ Problème : {incident.description}
-
-Merci de vous connecter pour traiter l'incident.""",
-        sender=current_app.config['MAIL_DEFAULT_SENDER'],
-    )
-
-    try:
-        print("[MAIL] Envoi du message d'assignation via Flask-Mail...")
-        mail.send(msg)
-        print(f"📩 Mail d'assignation envoyé à {technician.email}")
-        return True
-    except Exception as e:
-        print(f"❌ Erreur envoi assignation : {e!r}")
-        return False
+    threading.Thread(target=send_async_email, args=(smtp_config, msg_data)).start()
+    return True
