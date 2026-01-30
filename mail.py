@@ -3,9 +3,13 @@ import threading
 import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from flask_mail import Mail
+
+# CET OBJET DOIT EXISTER POUR QUE app.py NE CRASHE PAS
+mail = Mail()
 
 def send_async_email(smtp_config, msg_data):
-    """Envoi direct via SSL (Port 465)"""
+    """Envoi direct via SSL (Port 465) pour Render"""
     try:
         message = MIMEMultipart()
         message["From"] = smtp_config['sender']
@@ -13,17 +17,14 @@ def send_async_email(smtp_config, msg_data):
         message["Subject"] = msg_data['subject']
         message.attach(MIMEText(msg_data['body'], "plain"))
 
-        print(f"DEBUG: Tentative SSL via Port 465 vers {msg_data['to']}...")
-
-        # Connexion SSL directe (plus stable sur Render)
-        server = smtplib.SMTP_SSL(smtp_config['server'], 465, timeout=15)
-        server.login(smtp_config['user'], smtp_config['password'])
-        server.sendmail(smtp_config['sender'], msg_data['to'], message.as_string())
-        server.quit()
+        # Connexion SSL directe (Port 465 est le plus robuste sur Render)
+        with smtplib.SMTP_SSL(smtp_config['server'], 465, timeout=15) as server:
+            server.login(smtp_config['user'], smtp_config['password'])
+            server.sendmail(smtp_config['sender'], msg_data['to'], message.as_string())
         
-        print(f"📩 [MAIL SUCCESS] Email envoyé avec succès !")
+        print(f"📩 [MAIL SUCCESS] Email envoyé à {msg_data['to']}")
     except Exception as e:
-        print(f"❌ [MAIL ERROR] Échec : {str(e)}")
+        print(f"❌ [MAIL ERROR] Échec sur Render : {str(e)}")
 
 def send_welcome_email(user, password):
     smtp_config = {
@@ -35,7 +36,7 @@ def send_welcome_email(user, password):
 
     msg_data = {
         'to': user.email,
-        'subject': "✅ Bienvenue sur Le Phare Check",
+        'subject': "✅ Votre compte Le Phare Check",
         'body': f"Bonjour {user.username},\n\nVotre compte est prêt.\nIdentifiants : {user.username} / {password}"
     }
 
