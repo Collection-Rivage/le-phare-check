@@ -7,3 +7,4 @@ pg8000==1.29.4
 python-dotenv==1.0.1
 SQLAlchemy==2.0.46
 gunicorn==21.2.0
+requests

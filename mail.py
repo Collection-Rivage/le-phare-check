@@ -1,46 +1,58 @@
-import smtplib
-import threading
 import os
-import sys
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from flask_mail import Mail
+import requests
+import threading
+from flask_mail import Mail # Pour ne pas casser app.py
 
-# Cet objet permet à app.py de ne pas crasher à l'importation
+# On garde l'objet pour la compatibilité
 mail = Mail()
 
-def send_async_email(smtp_config, msg_data):
-    """Fonction d'envoi en arrière-plan avec logs détaillés"""
-    print(f"🚀 [MAIL] Démarrage de l'envoi pour {msg_data['to']}...", flush=True)
+def send_async_email(payload):
+    """Envoi via l'API Brevo (Port 443 Web - Impossible à bloquer)"""
+    url = "https://api.brevo.com/v3/smtp/email"
+    headers = {
+        "accept": "application/json",
+        "content-type": "application/json",
+        "api-key": os.getenv("BREVO_API_KEY")
+    }
     
     try:
-        # 1. Création du message
-        message = MIMEMultipart()
-        message["From"] = smtp_config['sender']
-        message["To"] = msg_data['to']
-        message["Subject"] = msg_data['subject']
-        message.attach(MIMEText(msg_data['body'], "plain"))
-
-        # 2. Connexion SSL au Port 465
-        print(f"📡 [MAIL] Connexion à {smtp_config['server']} sur le port 465...", flush=True)
-        
-        # On utilise un timeout de 20 secondes pour ne pas rester bloqué
-        with smtplib.SMTP_SSL(smtp_config['server'], 465, timeout=20) as server:
-            print(f"🔑 [MAIL] Authentification pour {smtp_config['user']}...", flush=True)
-            server.login(smtp_config['user'], smtp_config['password'])
-            
-            print(f"📤 [MAIL] Envoi en cours...", flush=True)
-            server.sendmail(smtp_config['sender'], msg_data['to'], message.as_string())
-            
-        print(f"✅ [MAIL SUCCESS] Email bien envoyé à {msg_data['to']} !", flush=True)
-        
-    except smtplib.SMTPAuthenticationError:
-        print(f"❌ [MAIL ERROR] Identifiants incorrects. Vérifiez le mot de passe d'application (16 lettres).", flush=True, file=sys.stderr)
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        if response.status_code == 201:
+            print(f"📩 [MAIL SUCCESS] Via API Brevo !")
+        else:
+            print(f"❌ [MAIL ERROR] Code {response.status_code} : {response.text}")
     except Exception as e:
-        print(f"❌ [MAIL ERROR] Détails de l'erreur : {str(e)}", flush=True, file=sys.stderr)
+        print(f"❌ [MAIL ERROR] Erreur réseau API : {str(e)}")
 
 def send_welcome_email(user, password):
-    """Prépare le mail de bienvenue et lance le thread"""
+    sender_email = os.getenv("MAIL_DEFAULT_SENDER", "stephane@lephare-iledere.com")
+    
+    payload = {
+        "sender": {"name": "Le Phare Check", "email": sender_email},
+        "to": [{"email": user.email}],
+        "subject": "✅ Votre compte Le Phare Check",
+        "htmlContent": f"""
+            <h3>Bienvenue {user.username}</h3>
+            <p>Votre compte est prêt.</p>
+            <p>Identifiants : <b>{user.username}</b> / <b>{password}</b></p>
+        """
+    }
+
+    threading.Thread(target=send_async_email, args=(payload,)).start()
+    return True
+
+def send_assignment_email(incident, technician):
+    sender_email = os.getenv("MAIL_DEFAULT_SENDER", "stephane@lephare-iledere.com")
+
+    payload = {
+        "sender": {"name": "Le Phare Check", "email": sender_email},
+        "to": [{"email": technician.email}],
+        "subject": "🔔 Nouvel incident assigné",
+        "htmlContent": f"<p>Bonjour, un incident vous attend à l'hébergement {incident.hebergement.emplacement}.</p>"
+    }
+
+    threading.Thread(target=send_async_email, args=(payload,)).start()
+    return True
     print(f"📝 [MAIL] Préparation mail de bienvenue pour {user.email}", flush=True)
     
     smtp_config = {
