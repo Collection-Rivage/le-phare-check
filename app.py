@@ -245,5 +245,23 @@ def delete_user(id):
 def api_status():
     return jsonify({'status': 'online' if os.environ.get('RENDER') else 'local'})
 
+@app.route('/debug-reset-admin')
+def debug_reset_admin():
+    user = User.query.filter_by(username='admin').first()
+    if user:
+        db.session.delete(user)
+        db.session.commit()
+    
+    new_admin = User(
+        username='admin', 
+        email='admin@lephare.com', 
+        role='admin', 
+        must_change_password=False
+    )
+    new_admin.set_password('admin123')
+    db.session.add(new_admin)
+    db.session.commit()
+    return "✅ L'admin sur Render a été réinitialisé ! Identifiant: admin | MDP: admin123"
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
