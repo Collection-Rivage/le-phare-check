@@ -177,24 +177,34 @@ def admin_users():
 @app.route('/admin/users/add', methods=['POST'])
 @login_required
 def add_user():
-    if current_user.role != 'admin': return redirect(url_for('dashboard'))
-    username, email, role = request.form.get('username'), request.form.get('email'), request.form.get('role')
-    if User.query.filter(or_(User.username==username, User.email==email)).first(): flash('Existe déjà', 'danger')
+    if current_user.role != 'admin': 
+        return redirect(url_for('dashboard'))
+    
+    username = request.form.get('username')
+    email = request.form.get('email')
+    role = request.form.get('role')
+    
+    if User.query.filter(or_(User.username==username, User.email==email)).first():
+        flash('Erreur : cet utilisateur ou cet email existe déjà.', 'danger')
     else:
-        pwd = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
-        u = User(username=username, email=email, role=role, must_change_password=True); u.set_password(pwd)
-        db.session.add(u); db.session.commit(); send_welcome_email(u, pwd); flash(f'Utilisateur créé !', 'success')
-    return redirect(url_for('admin_users'))
-
-@app.route('/admin/users/edit/<int:id>', methods=['POST'])
-@login_required
-def edit_user(id):
-    if current_user.role != 'admin': return redirect(url_for('admin_users'))
-    u = db.session.get(User, id)
-    if u:
-        u.role = request.form.get('role')
-        if request.form.get('password'): u.set_password(request.form.get('password')); u.must_change_password = True
-        db.session.commit(); flash('Utilisateur mis à jour', 'success')
+        # 1. GENERER LE MDP UNE SEULE FOIS
+        generated_pwd = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+        
+        # 2. CREER L'OBJET USER
+        user = User(username=username, email=email, role=role, must_change_password=True)
+        
+        # 3. APPLIQUER LE MDP (Hachage)
+        user.set_password(generated_pwd)
+        
+        # 4. SAUVEGARDER
+        db.session.add(user)
+        db.session.commit()
+        
+        # 5. ENVOYER LE MAIL AVEC LE MDP EN CLAIR
+        send_welcome_email(user, generated_pwd)
+        
+        flash(f'L\'utilisateur {username} a été créé. Un mail d\'invitation avec le mot de passe ({generated_pwd}) a été envoyé.', 'success')
+        
     return redirect(url_for('admin_users'))
 
 @app.route('/admin/users/delete/<int:id>')
