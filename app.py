@@ -228,7 +228,19 @@ def add_user():
         db.session.add(user)
         db.session.commit()
         send_welcome_email(user, password)
-        flash(f'Utilisateur {username} créé et invité par mail !', 'success')
+        flash(f'Utilisateur {username} créé !', 'success')
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/users/edit/<int:id>', methods=['POST'])
+@login_required
+def edit_user(id):
+    if current_user.role != 'admin': return redirect(url_for('admin_users'))
+    user = db.session.get(User, id)
+    user.role = request.form.get('role')
+    if request.form.get('password'):
+        user.set_password(request.form.get('password'))
+    db.session.commit()
+    flash('Utilisateur modifié', 'success')
     return redirect(url_for('admin_users'))
 
 @app.route('/admin/users/delete/<int:id>')
@@ -241,27 +253,20 @@ def delete_user(id):
     flash('Utilisateur supprimé', 'warning')
     return redirect(url_for('admin_users'))
 
-@app.route('/api/status')
-def api_status():
-    return jsonify({'status': 'online' if os.environ.get('RENDER') else 'local'})
+# ===================== DEBUG & RÉPARATION =====================
 
 @app.route('/debug-reset-admin')
 def debug_reset_admin():
     user = User.query.filter_by(username='admin').first()
-    if user:
-        db.session.delete(user)
-        db.session.commit()
-    
-    new_admin = User(
-        username='admin', 
-        email='admin@lephare.com', 
-        role='admin', 
-        must_change_password=False
-    )
+    if user: db.session.delete(user); db.session.commit()
+    new_admin = User(username='admin', email='admin@lephare.com', role='admin', must_change_password=False)
     new_admin.set_password('admin123')
-    db.session.add(new_admin)
-    db.session.commit()
-    return "✅ L'admin sur Render a été réinitialisé ! Identifiant: admin | MDP: admin123"
+    db.session.add(new_admin); db.session.commit()
+    return "✅ Admin réinitialisé ! ID: admin | MDP: admin123"
+
+@app.route('/api/status')
+def api_status():
+    return jsonify({'status': 'online' if os.environ.get('RENDER') else 'local'})
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
