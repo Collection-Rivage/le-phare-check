@@ -32,15 +32,17 @@ def inject_globals():
 
 with app.app_context():
     db.create_all()
+    # Création automatique des types s'ils manquent
     if TypeHebergement.query.count() == 0:
         types_defaut = [
             TypeHebergement(nom='Cabane', description='Cabanes en bois'),
-            TypeHebergement(nom='Mobil-home Staff', description='Hébergements pour le personnel'),
+            TypeHebergement(nom='Mobil-home Staff', description='Hébergements personnel'),
             TypeHebergement(nom='Mobil-home Standard', description='Hébergements clients'),
-            TypeHebergement(nom='Espace Bien Être', description='Spa, Sauna, etc.')
+            TypeHebergement(nom='Espace Bien Être', description='Spa/Sauna')
         ]
         db.session.add_all(types_defaut)
         db.session.commit()
+    # Création de l'admin par défaut
     if User.query.filter_by(username='admin').first() is None:
         admin = User(username='admin', email='admin@lephare.com', role='admin', must_change_password=False)
         admin.set_password('admin123')
@@ -75,8 +77,8 @@ def logout():
 def change_password():
     if request.method == 'POST':
         new_pwd = request.form.get('new_password')
-        if new_pwd != request.form.get('confirm_password'): flash('Erreur mots de passe', 'danger')
-        elif len(new_pwd) < 6: flash('Trop court (min 6)', 'danger')
+        if new_pwd != request.form.get('confirm_password'): flash('Les mots de passe ne correspondent pas.', 'danger')
+        elif len(new_pwd) < 6: flash('Mot de passe trop court (min 6 caractères).', 'danger')
         else:
             current_user.set_password(new_pwd); current_user.must_change_password = False
             db.session.commit(); flash('Mot de passe mis à jour !', 'success')
@@ -110,7 +112,7 @@ def hebergements():
 def add_hebergement():
     if current_user.role != 'admin': return redirect(url_for('hebergements'))
     h = Hebergement(emplacement=request.form.get('emplacement'), type_id=request.form.get('type_id'), numero_chassis=request.form.get('numero_chassis'), nb_personnes=request.form.get('nb_personnes'), compteur_eau=request.form.get('compteur_eau'))
-    db.session.add(h); db.session.commit(); flash('Ajouté', 'success')
+    db.session.add(h); db.session.commit(); flash('Hébergement ajouté', 'success')
     return redirect(url_for('hebergements'))
 
 @app.route('/hebergements/edit/<int:id>', methods=['POST'])
@@ -120,7 +122,16 @@ def edit_hebergement(id):
     h = db.session.get(Hebergement, id)
     h.emplacement = request.form.get('emplacement'); h.type_id = request.form.get('type_id')
     h.numero_chassis = request.form.get('numero_chassis'); h.nb_personnes = request.form.get('nb_personnes')
-    h.compteur_eau = request.form.get('compteur_eau'); db.session.commit(); flash('Modifié', 'success')
+    h.compteur_eau = request.form.get('compteur_eau'); db.session.commit(); flash('Hébergement modifié', 'success')
+    return redirect(url_for('hebergements'))
+
+@app.route('/hebergements/delete/<int:id>')
+@login_required
+def delete_hebergement(id):
+    if current_user.role != 'admin': return redirect(url_for('hebergements'))
+    h = db.session.get(Hebergement, id)
+    if h:
+        db.session.delete(h); db.session.commit(); flash('Hébergement supprimé', 'warning')
     return redirect(url_for('hebergements'))
 
 # ===================== CHECKS & INCIDENTS =====================
@@ -135,7 +146,7 @@ def check(hebergement_id):
         if c.probleme_critique: heb.statut = 'probleme'
         elif not all([c.electricite, c.plomberie, c.chauffage, c.proprete, c.equipements]): heb.statut = 'alerte'
         else: heb.statut = 'ok'
-        db.session.commit(); flash('Enregistré !', 'success'); return redirect(url_for('dashboard'))
+        db.session.commit(); flash('Check enregistré !', 'success'); return redirect(url_for('dashboard'))
     return render_template('check.html', hebergement=heb)
 
 @app.route('/historique')
@@ -152,7 +163,7 @@ def signaler_incident(hebergement_id):
         db.session.add(i); heb.statut = 'probleme' if request.form.get('type_incident') == 'urgence' else 'alerte'
         db.session.commit()
         if i.assigne_a: send_assignment_email(i, db.session.get(User, i.assigne_a))
-        flash('Signalé !', 'success'); return redirect(url_for('hebergements'))
+        flash('Incident signalé !', 'success'); return redirect(url_for('hebergements'))
     return render_template('incident.html', hebergement=heb, techniciens=User.query.filter(User.role.in_(['technicien', 'admin'])).all())
 
 # ===================== ADMINISTRATION =====================
@@ -172,7 +183,7 @@ def add_user():
     else:
         pwd = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
         u = User(username=username, email=email, role=role, must_change_password=True); u.set_password(pwd)
-        db.session.add(u); db.session.commit(); send_welcome_email(u, pwd); flash(f'Créé !', 'success')
+        db.session.add(u); db.session.commit(); send_welcome_email(u, pwd); flash(f'Utilisateur créé !', 'success')
     return redirect(url_for('admin_users'))
 
 @app.route('/admin/users/edit/<int:id>', methods=['POST'])
@@ -180,15 +191,18 @@ def add_user():
 def edit_user(id):
     if current_user.role != 'admin': return redirect(url_for('admin_users'))
     u = db.session.get(User, id)
-    u.role = request.form.get('role')
-    if request.form.get('password'): u.set_password(request.form.get('password')); u.must_change_password = True
-    db.session.commit(); flash('Mis à jour', 'success'); return redirect(url_for('admin_users'))
+    if u:
+        u.role = request.form.get('role')
+        if request.form.get('password'): u.set_password(request.form.get('password')); u.must_change_password = True
+        db.session.commit(); flash('Utilisateur mis à jour', 'success')
+    return redirect(url_for('admin_users'))
 
 @app.route('/admin/users/delete/<int:id>')
 @login_required
 def delete_user(id):
     if current_user.role == 'admin' and id != current_user.id:
-        u = db.session.get(User, id); db.session.delete(u); db.session.commit(); flash('Supprimé', 'warning')
+        u = db.session.get(User, id)
+        if u: db.session.delete(u); db.session.commit(); flash('Utilisateur supprimé', 'warning')
     return redirect(url_for('admin_users'))
 
 @app.route('/types')
@@ -209,8 +223,10 @@ def add_type():
 @login_required
 def edit_type(id):
     if current_user.role == 'admin':
-        t = db.session.get(TypeHebergement, id); t.nom = request.form.get('nom'); t.description = request.form.get('description')
-        db.session.commit(); flash('Type modifié', 'success')
+        t = db.session.get(TypeHebergement, id)
+        if t:
+            t.nom = request.form.get('nom'); t.description = request.form.get('description')
+            db.session.commit(); flash('Type modifié', 'success')
     return redirect(url_for('types'))
 
 @app.route('/types/delete/<int:id>')
@@ -218,16 +234,18 @@ def edit_type(id):
 def delete_type(id):
     if current_user.role == 'admin':
         t = db.session.get(TypeHebergement, id)
-        if t.hebergements: flash('Utilisé !', 'danger')
-        else: db.session.delete(t); db.session.commit(); flash('Supprimé', 'warning')
+        if t and t.hebergements: flash('Impossible : ce type est utilisé par des hébergements', 'danger')
+        elif t: db.session.delete(t); db.session.commit(); flash('Type supprimé', 'warning')
     return redirect(url_for('types'))
+
+# ===================== DEBUG & RÉPARATION =====================
 
 @app.route('/debug-reset-admin')
 def debug_reset_admin():
     u = User.query.filter_by(username='admin').first()
     if u: db.session.delete(u); db.session.commit()
     a = User(username='admin', email='admin@lephare.com', role='admin', must_change_password=False); a.set_password('admin123')
-    db.session.add(a); db.session.commit(); return "✅ OK"
+    db.session.add(a); db.session.commit(); return "✅ Admin réinitialisé !"
 
 @app.route('/api/status')
 def api_status():
