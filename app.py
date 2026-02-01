@@ -30,8 +30,30 @@ def load_user(user_id):
 def inject_globals():
     return {"is_online": os.environ.get("RENDER") is not None}
 
+# ===================== INITIALISATION AUTOMATIQUE =====================
 with app.app_context():
     db.create_all()
+
+    # 1. Création des types d'hébergement s'ils manquent
+    if TypeHebergement.query.count() == 0:
+        print("Création des types d'hébergement par défaut...")
+        types_defaut = [
+            TypeHebergement(nom='Cabane', description='Cabanes en bois'),
+            TypeHebergement(nom='Mobil-home Staff', description='Hébergements pour le personnel'),
+            TypeHebergement(nom='Mobil-home Standard', description='Hébergements clients'),
+            TypeHebergement(nom='Espace Bien Être', description='Spa, Sauna, etc.')
+        ]
+        db.session.add_all(types_defaut)
+        db.session.commit()
+        print("✅ Types créés !")
+
+    # 2. Création de l'admin s'il manque
+    if User.query.filter_by(username='admin').first() is None:
+        admin = User(username='admin', email='admin@lephare.com', role='admin', must_change_password=False)
+        admin.set_password('admin123')
+        db.session.add(admin)
+        db.session.commit()
+        print("✅ Admin créé (admin / admin123)")
 
 # ===================== ROUTES DE CONNEXION =====================
 
@@ -105,20 +127,19 @@ def hebergements():
 
     page = request.args.get('page', 1, type=int)
 
-    # 1. Sous-requête pour compter les checks et dernier check
+    # Sous-requêtes pour les statistiques
     check_stats = db.session.query(
         Check.hebergement_id.label("hid"),
         func.count(Check.id).label("check_count"),
         func.max(Check.created_at).label("last_check_at"),
     ).group_by(Check.hebergement_id).subquery()
 
-    # 2. Sous-requête pour compter les incidents
     incident_stats = db.session.query(
         Incident.hebergement_id.label("hid"),
         func.count(Incident.id).label("incident_count"),
     ).group_by(Incident.hebergement_id).subquery()
 
-    # 3. Requête combinée pour envoyer les 4 données attendues par le HTML
+    # Requête principale adaptée au HTML
     query = db.session.query(
         Hebergement,
         func.coalesce(check_stats.c.check_count, 0),
@@ -154,7 +175,7 @@ def add_hebergement():
 @login_required
 def edit_hebergement(id):
     if current_user.role != 'admin': return redirect(url_for('hebergements'))
-    heb = Hebergement.query.get_or_404(id)
+    heb = db.session.get(Hebergement, id)
     heb.emplacement = request.form.get('emplacement')
     heb.type_id = request.form.get('type_id')
     heb.numero_chassis = request.form.get('numero_chassis')
@@ -164,22 +185,12 @@ def edit_hebergement(id):
     flash('Hébergement mis à jour', 'success')
     return redirect(url_for('hebergements'))
 
-@app.route('/hebergements/delete/<int:id>')
-@login_required
-def delete_hebergement(id):
-    if current_user.role != 'admin': return redirect(url_for('hebergements'))
-    heb = db.session.get(Hebergement, id)
-    db.session.delete(heb)
-    db.session.commit()
-    flash('Hébergement supprimé', 'warning')
-    return redirect(url_for('hebergements'))
-
 # ===================== CHECKS & INCIDENTS =====================
 
 @app.route('/check/<int:hebergement_id>', methods=['GET', 'POST'])
 @login_required
 def check(hebergement_id):
-    hebergement = Hebergement.query.get_or_404(hebergement_id)
+    hebergement = db.session.get(Hebergement, hebergement_id)
     if request.method == 'POST':
         nouveau_check = Check(
             hebergement_id=hebergement_id, user_id=current_user.id,
@@ -210,7 +221,7 @@ def historique():
 @app.route('/incident/<int:hebergement_id>', methods=['GET', 'POST'])
 @login_required
 def signaler_incident(hebergement_id):
-    hebergement = Hebergement.query.get_or_404(hebergement_id)
+    hebergement = db.session.get(Hebergement, hebergement_id)
     techniciens = User.query.filter(User.role.in_(['technicien', 'admin'])).all()
     if request.method == 'POST':
         incident = Incident(
@@ -251,7 +262,7 @@ def add_user():
         db.session.add(user)
         db.session.commit()
         send_welcome_email(user, password)
-        flash(f'Utilisateur {username} créé avec succès !', 'success')
+        flash(f'Utilisateur {username} créé !', 'success')
     return redirect(url_for('admin_users'))
 
 @app.route('/admin/users/edit/<int:id>', methods=['POST'])
@@ -291,6 +302,7 @@ def add_type():
     nouveau = TypeHebergement(nom=request.form.get('nom'), description=request.form.get('description'))
     db.session.add(nouveau)
     db.session.commit()
+    flash('Type d\'hébergement ajouté', 'success')
     return redirect(url_for('types'))
 
 # ===================== DEBUG & RÉPARATION =====================
@@ -305,7 +317,7 @@ def debug_reset_admin():
     new_admin.set_password('admin123')
     db.session.add(new_admin)
     db.session.commit()
-    return "✅ Admin réinitialisé avec succès ! Identifiant: admin | MDP: admin123"
+    return "✅ Admin réinitialisé ! Identifiant: admin | MDP: admin123"
 
 @app.route('/api/status')
 def api_status():
