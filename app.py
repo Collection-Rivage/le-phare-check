@@ -3,8 +3,6 @@ from markupsafe import Markup
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from config import Config
 from models import db, User, Hebergement, Check, TypeHebergement, Incident
-
-# IMPORTATION CORRIGÉE
 from mail import mail, send_welcome_email, send_assignment_email
 
 from sqlalchemy.orm import selectinload
@@ -16,9 +14,9 @@ import string
 app = Flask(__name__)
 app.config.from_object(Config)
 
-# ===================== INITIALISATION =====================
+# Initialisations
 db.init_app(app)
-mail.init_app(app) # <--- Liaison avec l'app
+mail.init_app(app)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -28,78 +26,21 @@ login_manager.login_view = 'login'
 def load_user(user_id):
     return db.session.get(User, int(user_id))
 
-
 @app.context_processor
 def inject_globals():
     return {"is_online": os.environ.get("RENDER") is not None}
 
-
 with app.app_context():
     db.create_all()
 
-    if User.query.count() == 0:
-        admin = User(username='admin', email='admin@lephare.com', role='admin')
-        admin.set_password('admin123')
-        db.session.add(admin)
-        db.session.commit()
-        print("Admin créé")
-
-    if TypeHebergement.query.count() == 0:
-        types_defaut = [
-            TypeHebergement(nom='Cabane'),
-            TypeHebergement(nom='Mobil-home Staff'),
-            TypeHebergement(nom='Mobil-home Standard'),
-            TypeHebergement(nom='Espace Bien Être'),
-        ]
-        db.session.add_all(types_defaut)
-        db.session.commit()
-        print("Types créés")
-
-    if Hebergement.query.count() == 0:
-        print("Création des 218 hébergements...")
-        type_cabane = TypeHebergement.query.filter_by(nom='Cabane').first()
-        type_mh_staff = TypeHebergement.query.filter_by(nom='Mobil-home Staff').first()
-        type_bien_etre = TypeHebergement.query.filter_by(nom='Espace Bien Être').first()
-
-        h = []
-        compteurs = ['devant_droite', 'devant_gauche', 'arriere_droite', 'arriere_gauche', 'devant_milieu', 'arriere_milieu']
-
-        for i in range(1, 190):
-            h.append(Hebergement(
-                emplacement=str(i),
-                type_id=type_cabane.id,
-                numero_chassis=f"CAB-2024-{str(i).zfill(3)}",
-                nb_personnes=4 if i % 3 == 0 else 2,
-                compteur_eau=compteurs[i % 6]
-            ))
-
-        for i in range(1, 29):
-            h.append(Hebergement(
-                emplacement=f"STAFF-{str(i).zfill(2)}",
-                type_id=type_mh_staff.id,
-                numero_chassis=f"MHS-2024-{str(i).zfill(3)}",
-                nb_personnes=2,
-                compteur_eau=compteurs[i % 6]
-            ))
-
-        h.append(Hebergement(
-            emplacement='BIEN-ETRE-01',
-            type_id=type_bien_etre.id,
-            numero_chassis='EBE-2024-001',
-            nb_personnes=10,
-            compteur_eau='devant_milieu'
-        ))
-
-        db.session.add_all(h)
-        db.session.commit()
-        print("218 hébergements créés !")
-
+# ===================== ROUTES DE CONNEXION =====================
 
 @app.route('/')
 @login_required
 def index():
+    if current_user.must_change_password:
+        return redirect(url_for('change_password'))
     return redirect(url_for('dashboard'))
-
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -110,11 +51,12 @@ def login():
         user = User.query.filter_by(username=request.form.get('username')).first()
         if user and user.check_password(request.form.get('password')):
             login_user(user)
+            if user.must_change_password:
+                flash('Merci de personnaliser votre mot de passe pour continuer.', 'warning')
+                return redirect(url_for('change_password'))
             return redirect(url_for('dashboard'))
         flash('Identifiants incorrects', 'danger')
-
     return render_template('login.html')
-
 
 @app.route('/logout')
 @login_required
@@ -122,181 +64,57 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
+@app.route('/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    if request.method == 'POST':
+        new_pwd = request.form.get('new_password')
+        confirm_pwd = request.form.get('confirm_password')
+
+        if new_pwd != confirm_pwd:
+            flash('Les mots de passe ne correspondent pas.', 'danger')
+        elif len(new_pwd) < 6:
+            flash('Le mot de passe doit faire au moins 6 caractères.', 'danger')
+        else:
+            current_user.set_password(new_pwd)
+            current_user.must_change_password = False
+            db.session.commit()
+            flash('Mot de passe mis à jour !', 'success')
+            return redirect(url_for('dashboard'))
+    return render_template('change_password.html')
+
+# ===================== DASHBOARD & HEBERGEMENTS =====================
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
+    if current_user.must_change_password:
+        return redirect(url_for('change_password'))
+    
     total = Hebergement.query.count()
-
-    stats = dict(
-        db.session.query(Hebergement.statut, func.count(Hebergement.id))
-        .group_by(Hebergement.statut)
-        .all()
-    )
-
+    stats = dict(db.session.query(Hebergement.statut, func.count(Hebergement.id)).group_by(Hebergement.statut).all())
     ok = stats.get('ok', 0)
     alerte = stats.get('alerte', 0)
     probleme = stats.get('probleme', 0)
     taux_ok = round((ok / total) * 100, 1) if total else 0
-
-    derniers_checks = (
-        Check.query
-        .options(
-            selectinload(Check.hebergement).selectinload(Hebergement.type_hebergement),
-            selectinload(Check.technicien)
-        )
-        .order_by(Check.created_at.desc())
-        .limit(10)
-        .all()
-    )
-
-    return render_template(
-        'dashboard.html',
-        total=total,
-        ok=ok,
-        alerte=alerte,
-        probleme=probleme,
-        taux_ok=taux_ok,
-        derniers_checks=derniers_checks
-    )
-
-
-# === Toutes les autres routes (je te les remets toutes pour être sûr) ===
+    derniers_checks = Check.query.options(selectinload(Check.hebergement), selectinload(Check.technicien)).order_by(Check.created_at.desc()).limit(10).all()
+    
+    return render_template('dashboard.html', total=total, ok=ok, alerte=alerte, probleme=probleme, taux_ok=taux_ok, derniers_checks=derniers_checks)
 
 @app.route('/hebergements')
 @login_required
 def hebergements():
     page = request.args.get('page', 1, type=int)
-    q = request.args.get('q', '', type=str).strip()
-    statut = request.args.get('statut', '', type=str).strip()
-    type_id = request.args.get('type_id', '', type=str).strip()
-
-    check_stats = (
-        db.session.query(
-            Check.hebergement_id.label("hid"),
-            func.count(Check.id).label("check_count"),
-            func.max(Check.created_at).label("last_check_at"),
-        )
-        .group_by(Check.hebergement_id)
-        .subquery()
-    )
-
-    incident_stats = (
-        db.session.query(
-            Incident.hebergement_id.label("hid"),
-            func.count(Incident.id).label("incident_count"),
-        )
-        .group_by(Incident.hebergement_id)
-        .subquery()
-    )
-
-    query = (
-        Hebergement.query
-        .options(selectinload(Hebergement.type_hebergement))
-        .outerjoin(check_stats, check_stats.c.hid == Hebergement.id)
-        .outerjoin(incident_stats, incident_stats.c.hid == Hebergement.id)
-        .add_columns(
-            check_stats.c.check_count,
-            check_stats.c.last_check_at,
-            incident_stats.c.incident_count
-        )
-    )
-
-    if q:
-        query = query.filter(
-            or_(
-                Hebergement.emplacement.ilike(f"%{q}%"),
-                Hebergement.type_hebergement.has(TypeHebergement.nom.ilike(f"%{q}%"))
-            )
-        )
-
-    if statut in ('ok', 'alerte', 'probleme'):
-        query = query.filter(Hebergement.statut == statut)
-
-    if type_id.isdigit():
-        query = query.filter(Hebergement.type_id == int(type_id))
-
-    query = query.order_by(
-        case(
-            (Hebergement.emplacement.op('~')(r'^\d+$'), 1),
-            (Hebergement.emplacement.startswith('STAFF-'), 2),
-            (Hebergement.emplacement.startswith('BIEN-'), 3),
-            else_=4
-        ),
-        case(
-            (Hebergement.emplacement.op('~')(r'^\d+$'), cast(Hebergement.emplacement, Integer)),
-            (Hebergement.emplacement.startswith('STAFF-'), cast(func.substring(Hebergement.emplacement, 7), Integer)),
-            else_=0
-        ),
-        Hebergement.emplacement.asc()
-    )
-
+    # Tri simple pour éviter les erreurs Regex SQLite/Postgres
+    query = Hebergement.query.order_by(Hebergement.emplacement.asc())
     hebergements_list = query.paginate(page=page, per_page=20, error_out=False)
-    types = TypeHebergement.query.order_by(TypeHebergement.nom.asc()).all()
+    types = TypeHebergement.query.all()
     return render_template('hebergements.html', hebergements=hebergements_list, types=types)
-
-
-@app.route('/hebergements/add', methods=['POST'])
-@login_required
-def add_hebergement():
-    if current_user.role != 'admin':
-        flash('Accès refusé', 'danger')
-        return redirect(url_for('hebergements'))
-
-    nouvel_heb = Hebergement(
-        emplacement=request.form.get('emplacement'),
-        type_id=request.form.get('type_id'),
-        numero_chassis=request.form.get('numero_chassis'),
-        nb_personnes=request.form.get('nb_personnes'),
-        compteur_eau=request.form.get('compteur_eau')
-    )
-    db.session.add(nouvel_heb)
-    db.session.commit()
-    flash(f'Hébergement {nouvel_heb.emplacement} ajouté avec succès', 'success')
-    return redirect(url_for('hebergements'))
-
-
-@app.route('/hebergements/edit/<int:id>', methods=['POST'])
-@login_required
-def edit_hebergement(id):
-    if current_user.role != 'admin':
-        flash('Accès refusé', 'danger')
-        return redirect(url_for('hebergements'))
-
-    heb = Hebergement.query.get_or_404(id)
-    heb.emplacement = request.form.get('emplacement')
-    heb.type_id = request.form.get('type_id')
-    heb.numero_chassis = request.form.get('numero_chassis')
-    heb.nb_personnes = request.form.get('nb_personnes')
-    heb.compteur_eau = request.form.get('compteur_eau')
-    db.session.commit()
-    flash(f'Hébergement {heb.emplacement} modifié avec succès', 'success')
-    return redirect(url_for('hebergements'))
-
-
-@app.route('/hebergements/delete/<int:id>')
-@login_required
-def delete_hebergement(id):
-    if current_user.role != 'admin':
-        flash('Accès refusé', 'danger')
-        return redirect(url_for('hebergements'))
-
-    heb = Hebergement.query.get_or_404(id)
-    if len(heb.checks) > 0 or len(getattr(heb, 'incidents', [])) > 0:
-        flash('Impossible de supprimer : des checks ou incidents sont liés', 'danger')
-        return redirect(url_for('hebergements'))
-
-    db.session.delete(heb)
-    db.session.commit()
-    flash('Hébergement supprimé', 'warning')
-    return redirect(url_for('hebergements'))
-
 
 @app.route('/check/<int:hebergement_id>', methods=['GET', 'POST'])
 @login_required
 def check(hebergement_id):
     hebergement = Hebergement.query.get_or_404(hebergement_id)
-
     if request.method == 'POST':
         nouveau_check = Check(
             hebergement_id=hebergement_id,
@@ -310,95 +128,20 @@ def check(hebergement_id):
             probleme_critique=request.form.get('probleme_critique') == 'on'
         )
         db.session.add(nouveau_check)
-
-        if nouveau_check.probleme_critique:
-            hebergement.statut = 'probleme'
+        if nouveau_check.probleme_critique: hebergement.statut = 'probleme'
         elif not all([nouveau_check.electricite, nouveau_check.plomberie, nouveau_check.chauffage, nouveau_check.proprete, nouveau_check.equipements]):
             hebergement.statut = 'alerte'
-        else:
-            hebergement.statut = 'ok'
-
+        else: hebergement.statut = 'ok'
         db.session.commit()
         flash('Check enregistré !', 'success')
         return redirect(url_for('dashboard'))
-
     return render_template('check.html', hebergement=hebergement)
-
-
-@app.route('/historique')
-@login_required
-def historique():
-    checks = Check.query.order_by(Check.created_at.desc()).all()
-    return render_template('historique.html', checks=checks)
-
-
-@app.route('/types')
-@login_required
-def types():
-    if current_user.role != 'admin':
-        flash('Accès refusé', 'danger')
-        return redirect(url_for('dashboard'))
-    types = TypeHebergement.query.all()
-    return render_template('types.html', types=types)
-
-
-@app.route('/types/add', methods=['POST'])
-@login_required
-def add_type():
-    if current_user.role != 'admin':
-        flash('Accès refusé', 'danger')
-        return redirect(url_for('types'))
-
-    nom = request.form.get('nom')
-    description = request.form.get('description', '')
-    if TypeHebergement.query.filter_by(nom=nom).first():
-        flash('Ce type existe déjà', 'danger')
-    else:
-        nouveau = TypeHebergement(nom=nom, description=description)
-        db.session.add(nouveau)
-        db.session.commit()
-        flash(f'Type "{nom}" ajouté', 'success')
-    return redirect(url_for('types'))
-
-
-@app.route('/types/edit/<int:id>', methods=['POST'])
-@login_required
-def edit_type(id):
-    if current_user.role != 'admin':
-        flash('Accès refusé', 'danger')
-        return redirect(url_for('types'))
-
-    type_heb = TypeHebergement.query.get_or_404(id)
-    type_heb.nom = request.form.get('nom')
-    type_heb.description = request.form.get('description', '')
-    db.session.commit()
-    flash('Type modifié', 'success')
-    return redirect(url_for('types'))
-
-
-@app.route('/types/delete/<int:id>')
-@login_required
-def delete_type(id):
-    if current_user.role != 'admin':
-        flash('Accès refusé', 'danger')
-        return redirect(url_for('types'))
-
-    type_heb = TypeHebergement.query.get_or_404(id)
-    if len(type_heb.hebergements) > 0:
-        flash('Impossible : des hébergements utilisent ce type', 'danger')
-    else:
-        db.session.delete(type_heb)
-        db.session.commit()
-        flash('Type supprimé', 'warning')
-    return redirect(url_for('types'))
-
 
 @app.route('/incident/<int:hebergement_id>', methods=['GET', 'POST'])
 @login_required
 def signaler_incident(hebergement_id):
     hebergement = Hebergement.query.get_or_404(hebergement_id)
     techniciens = User.query.filter(User.role.in_(['technicien', 'admin'])).all()
-
     if request.method == 'POST':
         incident = Incident(
             hebergement_id=hebergement_id,
@@ -408,108 +151,54 @@ def signaler_incident(hebergement_id):
             cree_par=current_user.id
         )
         db.session.add(incident)
-
         hebergement.statut = 'probleme' if request.form.get('type_incident') == 'urgence' else 'alerte'
         db.session.commit()
-
-        # Envoi mail au technicien assigné
         if incident.assigne_a:
-            technicien = User.query.get(incident.assigne_a)
-            if technicien:
-                send_assignment_email(incident, technicien)
-
+            tech = db.session.get(User, incident.assigne_a)
+            send_assignment_email(incident, tech)
         flash('Incident signalé !', 'success')
         return redirect(url_for('hebergements'))
-
     return render_template('incident.html', hebergement=hebergement, techniciens=techniciens)
 
+# ===================== ADMINISTRATION =====================
 
 @app.route('/admin/users')
 @login_required
 def admin_users():
-    if current_user.role != 'admin':
-        flash('Accès refusé', 'danger')
-        return redirect(url_for('dashboard'))
-
+    if current_user.role != 'admin': return redirect(url_for('dashboard'))
     users = User.query.order_by(User.created_at.desc()).all()
-    admin_count = User.query.filter_by(role='admin').count()
-    return render_template('admin_users.html', users=users, admin_count=admin_count)
-
+    return render_template('admin_users.html', users=users)
 
 @app.route('/admin/users/add', methods=['POST'])
 @login_required
 def add_user():
-    if current_user.role != 'admin':
-        flash('Accès refusé', 'danger')
-        return redirect(url_for('admin_users'))
-
-    username = request.form.get('username')
-    email = request.form.get('email')
-    password_input = request.form.get('password')
-    role = request.form.get('role')
-
-    if User.query.filter_by(username=username).first():
-        flash('Nom d’utilisateur déjà pris', 'danger')
-    elif User.query.filter_by(email=email).first():
-        flash('Email déjà utilisé', 'danger')
+    if current_user.role != 'admin': return redirect(url_for('dashboard'))
+    username, email, role = request.form.get('username'), request.form.get('email'), request.form.get('role')
+    if User.query.filter_by(username=username).first() or User.query.filter_by(email=email).first():
+        flash('Utilisateur déjà existant', 'danger')
     else:
-        password = password_input or ''.join(random.choices(string.ascii_letters + string.digits, k=12))
-        user = User(username=username, email=email, role=role)
+        password = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+        user = User(username=username, email=email, role=role, must_change_password=True)
         user.set_password(password)
         db.session.add(user)
         db.session.commit()
-
-        # ← ENVOI DU MAIL DE BIENVENUE (c’est ça qui manquait !)
         send_welcome_email(user, password)
-
-        flash(f'✅ Utilisateur {username} créé avec succès !', 'success')
-        flash(Markup(f'🔑 Mot de passe temporaire : <strong>{password}</strong>'), 'info')
-
+        flash(f'Utilisateur {username} créé et invité par mail !', 'success')
     return redirect(url_for('admin_users'))
-
-
-@app.route('/admin/users/edit/<int:id>', methods=['POST'])
-@login_required
-def edit_user(id):
-    if current_user.role != 'admin':
-        flash('Accès refusé', 'danger')
-        return redirect(url_for('admin_users'))
-
-    user = User.query.get_or_404(id)
-    user.role = request.form.get('role')
-    if request.form.get('password'):
-        user.set_password(request.form.get('password'))
-    db.session.commit()
-    flash('Utilisateur modifié', 'success')
-    return redirect(url_for('admin_users'))
-
 
 @app.route('/admin/users/delete/<int:id>')
 @login_required
 def delete_user(id):
-    if current_user.role != 'admin':
-        flash('Accès refusé', 'danger')
-        return redirect(url_for('admin_users'))
-
-    user = User.query.get_or_404(id)
-
-    if user.id == current_user.id:
-        flash('Tu ne peux pas te supprimer toi-même !', 'danger')
-    elif user.role == 'admin' and User.query.filter_by(role='admin').count() == 1:
-        flash('Il doit rester au moins un administrateur dans l\'application', 'danger')
-    else:
-        db.session.delete(user)
-        db.session.commit()
-        flash(f'Utilisateur {user.username} supprimé avec succès', 'warning')
-
+    if current_user.role != 'admin' or id == current_user.id: return redirect(url_for('admin_users'))
+    user = db.session.get(User, id)
+    db.session.delete(user)
+    db.session.commit()
+    flash('Utilisateur supprimé', 'warning')
     return redirect(url_for('admin_users'))
-
 
 @app.route('/api/status')
 def api_status():
-    is_online = os.environ.get('RENDER') is not None
-    return jsonify({'status': 'online' if is_online else 'local'})
-
+    return jsonify({'status': 'online' if os.environ.get('RENDER') else 'local'})
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
