@@ -46,13 +46,11 @@ def index():
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
-
     if request.method == 'POST':
         user = User.query.filter_by(username=request.form.get('username')).first()
         if user and user.check_password(request.form.get('password')):
             login_user(user)
             if user.must_change_password:
-                flash('Merci de personnaliser votre mot de passe pour continuer.', 'warning')
                 return redirect(url_for('change_password'))
             return redirect(url_for('dashboard'))
         flash('Identifiants incorrects', 'danger')
@@ -70,7 +68,6 @@ def change_password():
     if request.method == 'POST':
         new_pwd = request.form.get('new_password')
         confirm_pwd = request.form.get('confirm_password')
-
         if new_pwd != confirm_pwd:
             flash('Les mots de passe ne correspondent pas.', 'danger')
         elif len(new_pwd) < 6:
@@ -90,26 +87,53 @@ def change_password():
 def dashboard():
     if current_user.must_change_password:
         return redirect(url_for('change_password'))
-    
     total = Hebergement.query.count()
     stats = dict(db.session.query(Hebergement.statut, func.count(Hebergement.id)).group_by(Hebergement.statut).all())
-    ok = stats.get('ok', 0)
-    alerte = stats.get('alerte', 0)
-    probleme = stats.get('probleme', 0)
+    ok, alerte, probleme = stats.get('ok', 0), stats.get('alerte', 0), stats.get('probleme', 0)
     taux_ok = round((ok / total) * 100, 1) if total else 0
     derniers_checks = Check.query.options(selectinload(Check.hebergement), selectinload(Check.technicien)).order_by(Check.created_at.desc()).limit(10).all()
-    
     return render_template('dashboard.html', total=total, ok=ok, alerte=alerte, probleme=probleme, taux_ok=taux_ok, derniers_checks=derniers_checks)
 
 @app.route('/hebergements')
 @login_required
 def hebergements():
     page = request.args.get('page', 1, type=int)
-    # Tri simple pour éviter les erreurs Regex SQLite/Postgres
     query = Hebergement.query.order_by(Hebergement.emplacement.asc())
     hebergements_list = query.paginate(page=page, per_page=20, error_out=False)
     types = TypeHebergement.query.all()
     return render_template('hebergements.html', hebergements=hebergements_list, types=types)
+
+@app.route('/hebergements/add', methods=['POST'])
+@login_required
+def add_hebergement():
+    if current_user.role != 'admin': return redirect(url_for('hebergements'))
+    nouvel_heb = Hebergement(
+        emplacement=request.form.get('emplacement'),
+        type_id=request.form.get('type_id'),
+        numero_chassis=request.form.get('numero_chassis'),
+        nb_personnes=request.form.get('nb_personnes'),
+        compteur_eau=request.form.get('compteur_eau')
+    )
+    db.session.add(nouvel_heb)
+    db.session.commit()
+    flash('Hébergement ajouté', 'success')
+    return redirect(url_for('hebergements'))
+
+@app.route('/hebergements/edit/<int:id>', methods=['POST'])
+@login_required
+def edit_hebergement(id):
+    if current_user.role != 'admin': return redirect(url_for('hebergements'))
+    heb = Hebergement.query.get_or_404(id)
+    heb.emplacement = request.form.get('emplacement')
+    heb.type_id = request.form.get('type_id')
+    heb.numero_chassis = request.form.get('numero_chassis')
+    heb.nb_personnes = request.form.get('nb_personnes')
+    heb.compteur_eau = request.form.get('compteur_eau')
+    db.session.commit()
+    flash('Hébergement modifié', 'success')
+    return redirect(url_for('hebergements'))
+
+# ===================== CHECKS & INCIDENTS =====================
 
 @app.route('/check/<int:hebergement_id>', methods=['GET', 'POST'])
 @login_required
@@ -117,8 +141,7 @@ def check(hebergement_id):
     hebergement = Hebergement.query.get_or_404(hebergement_id)
     if request.method == 'POST':
         nouveau_check = Check(
-            hebergement_id=hebergement_id,
-            user_id=current_user.id,
+            hebergement_id=hebergement_id, user_id=current_user.id,
             electricite=request.form.get('electricite') == 'on',
             plomberie=request.form.get('plomberie') == 'on',
             chauffage=request.form.get('chauffage') == 'on',
@@ -137,6 +160,12 @@ def check(hebergement_id):
         return redirect(url_for('dashboard'))
     return render_template('check.html', hebergement=hebergement)
 
+@app.route('/historique')
+@login_required
+def historique():
+    checks = Check.query.order_by(Check.created_at.desc()).all()
+    return render_template('historique.html', checks=checks)
+
 @app.route('/incident/<int:hebergement_id>', methods=['GET', 'POST'])
 @login_required
 def signaler_incident(hebergement_id):
@@ -144,10 +173,8 @@ def signaler_incident(hebergement_id):
     techniciens = User.query.filter(User.role.in_(['technicien', 'admin'])).all()
     if request.method == 'POST':
         incident = Incident(
-            hebergement_id=hebergement_id,
-            type_incident=request.form.get('type_incident'),
-            description=request.form.get('description'),
-            assigne_a=request.form.get('assigne_a') or None,
+            hebergement_id=hebergement_id, type_incident=request.form.get('type_incident'),
+            description=request.form.get('description'), assigne_a=request.form.get('assigne_a') or None,
             cree_par=current_user.id
         )
         db.session.add(incident)
@@ -160,7 +187,25 @@ def signaler_incident(hebergement_id):
         return redirect(url_for('hebergements'))
     return render_template('incident.html', hebergement=hebergement, techniciens=techniciens)
 
-# ===================== ADMINISTRATION =====================
+# ===================== GESTION DES TYPES =====================
+
+@app.route('/types')
+@login_required
+def types():
+    if current_user.role != 'admin': return redirect(url_for('dashboard'))
+    all_types = TypeHebergement.query.all()
+    return render_template('types.html', types=all_types)
+
+@app.route('/types/add', methods=['POST'])
+@login_required
+def add_type():
+    if current_user.role != 'admin': return redirect(url_for('types'))
+    nouveau = TypeHebergement(nom=request.form.get('nom'), description=request.form.get('description'))
+    db.session.add(nouveau)
+    db.session.commit()
+    return redirect(url_for('types'))
+
+# ===================== ADMINISTRATION UTILISATEURS =====================
 
 @app.route('/admin/users')
 @login_required
