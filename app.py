@@ -30,11 +30,11 @@ def load_user(user_id):
 def inject_globals():
     return {"is_online": os.environ.get("RENDER") is not None}
 
-# ===================== INITIALISATION AUTOMATIQUE (BOUCLE DE SÉCURITÉ) =====================
+# ===================== INITIALISATION AUTOMATIQUE =====================
 with app.app_context():
     db.create_all()
 
-    # 1. CRÉATION DES TYPES (si absents)
+    # 1. CRÉATION DES TYPES (Indispensable pour la suite)
     if TypeHebergement.query.count() == 0:
         print("Initialisation des types d'hébergement...")
         t1 = TypeHebergement(nom='Cabane', description='Cabanes en bois')
@@ -42,10 +42,10 @@ with app.app_context():
         t3 = TypeHebergement(nom='Mobil-home Standard', description='Hébergements clients')
         t4 = TypeHebergement(nom='Espace Bien Être', description='Spa/Sauna')
         db.session.add_all([t1, t2, t3, t4])
-        db.session.commit()
+        db.session.commit() # On valide ici pour que les IDs soient générés
         print("✅ Types créés.")
 
-    # 2. CRÉATION DE L'ADMIN (si absent)
+    # 2. CRÉATION DE L'ADMIN
     if User.query.filter_by(username='admin').first() is None:
         admin = User(username='admin', email='admin@lephare.com', role='admin', must_change_password=False)
         admin.set_password('admin123')
@@ -53,18 +53,20 @@ with app.app_context():
         db.session.commit()
         print("✅ Admin créé (admin / admin123)")
 
-    # 3. CRÉATION DES 218 HÉBERGEMENTS (si la table est vide)
+    # 3. CRÉATION DES 218 HÉBERGEMENTS
     if Hebergement.query.count() == 0:
         print("Création des 218 hébergements...")
-        # On récupère les IDs qui viennent d'être créés
+        # On récupère les objets créés à l'étape 1
         type_cabane = TypeHebergement.query.filter_by(nom='Cabane').first()
         type_staff = TypeHebergement.query.filter_by(nom='Mobil-home Staff').first()
         type_be = TypeHebergement.query.filter_by(nom='Espace Bien Être').first()
         
+        # On vérifie qu'ils existent pour éviter le crash "NoneType"
         if type_cabane and type_staff and type_be:
             compteurs = ['devant_droite', 'devant_gauche', 'arriere_droite', 'arriere_gauche', 'devant_milieu', 'arriere_milieu']
             h_list = []
 
+            # 189 Cabanes
             for i in range(1, 190):
                 h_list.append(Hebergement(
                     emplacement=str(i), type_id=type_cabane.id,
@@ -73,6 +75,7 @@ with app.app_context():
                     compteur_eau=compteurs[i % 6]
                 ))
 
+            # 28 Staff
             for i in range(1, 29):
                 h_list.append(Hebergement(
                     emplacement=f"STAFF-{str(i).zfill(2)}", type_id=type_staff.id,
@@ -80,6 +83,7 @@ with app.app_context():
                     nb_personnes=2, compteur_eau=compteurs[i % 6]
                 ))
 
+            # 1 Bien être
             h_list.append(Hebergement(
                 emplacement='BIEN-ETRE-01', type_id=type_be.id,
                 numero_chassis='EBE-2024-001', nb_personnes=10, compteur_eau='devant_milieu'
@@ -88,10 +92,8 @@ with app.app_context():
             db.session.add_all(h_list)
             db.session.commit()
             print("✅ 218 hébergements créés !")
-        else:
-            print("❌ Erreur : Impossible de trouver les types pour créer les hébergements.")
 
-# ===================== ROUTES =====================
+# ===================== ROUTES CONNEXION =====================
 
 @app.route('/')
 @login_required
@@ -128,6 +130,8 @@ def change_password():
             return redirect(url_for('dashboard'))
     return render_template('change_password.html')
 
+# ===================== DASHBOARD & HEBERGEMENTS =====================
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -153,7 +157,7 @@ def hebergements():
 def add_hebergement():
     if current_user.role != 'admin': return redirect(url_for('hebergements'))
     h = Hebergement(emplacement=request.form.get('emplacement'), type_id=request.form.get('type_id'), numero_chassis=request.form.get('numero_chassis'), nb_personnes=request.form.get('nb_personnes'), compteur_eau=request.form.get('compteur_eau'))
-    db.session.add(h); db.session.commit(); flash('Hébergement ajouté', 'success')
+    db.session.add(h); db.session.commit(); flash('Ajouté', 'success')
     return redirect(url_for('hebergements'))
 
 @app.route('/hebergements/edit/<int:id>', methods=['POST'])
@@ -163,7 +167,7 @@ def edit_hebergement(id):
     h = db.session.get(Hebergement, id)
     h.emplacement = request.form.get('emplacement'); h.type_id = request.form.get('type_id')
     h.numero_chassis = request.form.get('numero_chassis'); h.nb_personnes = request.form.get('nb_personnes')
-    h.compteur_eau = request.form.get('compteur_eau'); db.session.commit(); flash('Hébergement modifié', 'success')
+    h.compteur_eau = request.form.get('compteur_eau'); db.session.commit(); flash('Modifié', 'success')
     return redirect(url_for('hebergements'))
 
 @app.route('/hebergements/delete/<int:id>')
@@ -171,8 +175,10 @@ def edit_hebergement(id):
 def delete_hebergement(id):
     if current_user.role != 'admin': return redirect(url_for('hebergements'))
     h = db.session.get(Hebergement, id)
-    if h: db.session.delete(h); db.session.commit(); flash('Hébergement supprimé', 'warning')
+    db.session.delete(h); db.session.commit(); flash('Supprimé', 'warning')
     return redirect(url_for('hebergements'))
+
+# ===================== CHECKS & INCIDENTS =====================
 
 @app.route('/check/<int:hebergement_id>', methods=['GET', 'POST'])
 @login_required
@@ -206,6 +212,8 @@ def signaler_incident(hebergement_id):
         flash('Incident signalé !', 'success'); return redirect(url_for('hebergements'))
     return render_template('incident.html', hebergement=heb, techniciens=techniciens)
 
+# ===================== ADMINISTRATION =====================
+
 @app.route('/admin/users')
 @login_required
 def admin_users():
@@ -221,7 +229,7 @@ def add_user():
     else:
         pwd = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
         u = User(username=username, email=email, role=role, must_change_password=True); u.set_password(pwd)
-        db.session.add(u); db.session.commit(); send_welcome_email(u, pwd); flash(f'Utilisateur créé ! Mot de passe : {pwd}', 'success')
+        db.session.add(u); db.session.commit(); send_welcome_email(u, pwd); flash(f'Utilisateur créé !', 'success')
     return redirect(url_for('admin_users'))
 
 @app.route('/admin/users/edit/<int:id>', methods=['POST'])
