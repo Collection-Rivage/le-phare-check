@@ -30,36 +30,20 @@ def load_user(user_id):
 def inject_globals():
     return {"is_online": os.environ.get("RENDER") is not None}
 
-# ===================== INITIALISATION AUTOMATIQUE =====================
 with app.app_context():
     db.create_all()
-    
-    # 1. Création des types
     if TypeHebergement.query.count() == 0:
-        t1 = TypeHebergement(nom='Cabane', description='Cabanes en bois')
-        t2 = TypeHebergement(nom='Mobil-home Staff', description='Hébergements personnel')
-        t3 = TypeHebergement(nom='Mobil-home Standard', description='Hébergements clients')
-        t4 = TypeHebergement(nom='Espace Bien Être', description='Spa/Sauna')
-        db.session.add_all([t1, t2, t3, t4])
-        db.session.commit()
-
-    # 2. Création de l'admin
+        types_defaut = [
+            TypeHebergement(nom='Cabane', description='Cabanes en bois'),
+            TypeHebergement(nom='Mobil-home Staff', description='Hébergements personnel'),
+            TypeHebergement(nom='Mobil-home Standard', description='Hébergements clients'),
+            TypeHebergement(nom='Espace Bien Être', description='Spa/Sauna')
+        ]
+        db.session.add_all(types_defaut); db.session.commit()
     if User.query.filter_by(username='admin').first() is None:
         admin = User(username='admin', email='admin@lephare.com', role='admin', must_change_password=False)
         admin.set_password('admin123')
         db.session.add(admin); db.session.commit()
-
-    # 3. Création des 218 hébergements
-    if Hebergement.query.count() == 0:
-        type_cabane = TypeHebergement.query.filter_by(nom='Cabane').first()
-        type_staff = TypeHebergement.query.filter_by(nom='Mobil-home Staff').first()
-        type_be = TypeHebergement.query.filter_by(nom='Espace Bien Être').first()
-        compteurs = ['devant_droite', 'devant_gauche', 'arriere_droite', 'arriere_gauche', 'devant_milieu', 'arriere_milieu']
-        h_list = []
-        for i in range(1, 190): h_list.append(Hebergement(emplacement=str(i), type_id=type_cabane.id, numero_chassis=f"CAB-2024-{str(i).zfill(3)}", nb_personnes=2, compteur_eau=compteurs[i%6]))
-        for i in range(1, 29): h_list.append(Hebergement(emplacement=f"STAFF-{str(i).zfill(2)}", type_id=type_staff.id, numero_chassis=f"MHS-2024-{str(i).zfill(2)}", nb_personnes=2, compteur_eau=compteurs[i%6]))
-        h_list.append(Hebergement(emplacement='BIEN-ETRE-01', type_id=type_be.id, nb_personnes=10))
-        db.session.add_all(h_list); db.session.commit()
 
 # ===================== ROUTES CONNEXION =====================
 
@@ -142,7 +126,7 @@ def edit_hebergement(id):
 def delete_hebergement(id):
     if current_user.role != 'admin': return redirect(url_for('hebergements'))
     h = db.session.get(Hebergement, id)
-    db.session.delete(h); db.session.commit(); flash('Hébergement supprimé', 'warning')
+    if h: db.session.delete(h); db.session.commit(); flash('Hébergement supprimé', 'warning')
     return redirect(url_for('hebergements'))
 
 # ===================== CHECKS & INCIDENTS =====================
@@ -185,28 +169,44 @@ def signaler_incident(hebergement_id):
 @login_required
 def admin_users():
     if current_user.role != 'admin': return redirect(url_for('dashboard'))
-    return render_template('admin_users.html', users=User.query.order_by(User.created_at.desc()).all())
+    users = User.query.order_by(User.created_at.desc()).all()
+    return render_template('admin_users.html', users=users)
 
 @app.route('/admin/users/add', methods=['POST'])
 @login_required
 def add_user():
     if current_user.role != 'admin': return redirect(url_for('dashboard'))
     username, email, role = request.form.get('username'), request.form.get('email'), request.form.get('role')
-    if User.query.filter(or_(User.username==username, User.email==email)).first(): flash('Erreur : cet utilisateur ou email existe déjà.', 'danger')
+    
+    if User.query.filter(or_(User.username==username, User.email==email)).first():
+        flash('Erreur : cet utilisateur ou email existe déjà.', 'danger')
     else:
-        pwd = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
-        u = User(username=username, email=email, role=role, must_change_password=True); u.set_password(pwd)
-        db.session.add(u); db.session.commit(); send_welcome_email(u, pwd); flash(f'Utilisateur {username} créé ! Mot de passe : {pwd}', 'success')
+        # --- FIX: ON GÉNÈRE LE MOT DE PASSE UNE SEULE FOIS ---
+        generated_password = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+        
+        u = User(username=username, email=email, role=role, must_change_password=True)
+        u.set_password(generated_password) # Utilisation de la variable
+        
+        db.session.add(u)
+        db.session.commit()
+        
+        # --- FIX: ON ENVOIE LA MÊME VARIABLE AU MAIL ---
+        send_welcome_email(u, generated_password)
+        
+        flash(f'Utilisateur {username} créé avec succès !', 'success')
+        
     return redirect(url_for('admin_users'))
 
 @app.route('/admin/users/edit/<int:id>', methods=['POST'])
 @login_required
 def edit_user(id):
-    if current_user.role != 'admin': return redirect(url_for('admin_users'))
+    if current_user.role != 'admin': return redirect(url_for('dashboard'))
     u = db.session.get(User, id)
     if u:
         u.role = request.form.get('role')
-        if request.form.get('password'): u.set_password(request.form.get('password')); u.must_change_password = True
+        if request.form.get('password'):
+            u.set_password(request.form.get('password'))
+            u.must_change_password = True
         db.session.commit(); flash('Utilisateur mis à jour', 'success')
     return redirect(url_for('admin_users'))
 
@@ -214,7 +214,8 @@ def edit_user(id):
 @login_required
 def delete_user(id):
     if current_user.role == 'admin' and id != current_user.id:
-        u = db.session.get(User, id); db.session.delete(u); db.session.commit(); flash('Utilisateur supprimé', 'warning')
+        u = db.session.get(User, id)
+        if u: db.session.delete(u); db.session.commit(); flash('Supprimé', 'warning')
     return redirect(url_for('admin_users'))
 
 @app.route('/types')
@@ -222,38 +223,6 @@ def delete_user(id):
 def types():
     if current_user.role != 'admin': return redirect(url_for('dashboard'))
     return render_template('types.html', types=TypeHebergement.query.all())
-
-@app.route('/types/add', methods=['POST'])
-@login_required
-def add_type():
-    if current_user.role == 'admin':
-        t = TypeHebergement(nom=request.form.get('nom'), description=request.form.get('description'))
-        db.session.add(t); db.session.commit(); flash('Type ajouté', 'success')
-    return redirect(url_for('types'))
-
-@app.route('/types/edit/<int:id>', methods=['POST'])
-@login_required
-def edit_type(id):
-    if current_user.role == 'admin':
-        t = db.session.get(TypeHebergement, id); t.nom = request.form.get('nom'); t.description = request.form.get('description')
-        db.session.commit(); flash('Type modifié', 'success')
-    return redirect(url_for('types'))
-
-@app.route('/types/delete/<int:id>')
-@login_required
-def delete_type(id):
-    if current_user.role == 'admin':
-        t = db.session.get(TypeHebergement, id)
-        if t.hebergements: flash('Impossible : utilisé par des hébergements', 'danger')
-        else: db.session.delete(t); db.session.commit(); flash('Supprimé', 'warning')
-    return redirect(url_for('types'))
-
-@app.route('/debug-reset-admin')
-def debug_reset_admin():
-    u = User.query.filter_by(username='admin').first()
-    if u: db.session.delete(u); db.session.commit()
-    a = User(username='admin', email='admin@lephare.com', role='admin', must_change_password=False); a.set_password('admin123')
-    db.session.add(a); db.session.commit(); return "✅ OK"
 
 @app.route('/api/status')
 def api_status():
