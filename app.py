@@ -32,7 +32,7 @@ def inject_globals():
 
 with app.app_context():
     db.create_all()
-    # Initialisation Types
+    # Init Types
     if TypeHebergement.query.count() == 0:
         types = [
             TypeHebergement(nom='Cabane', description='Cabanes bois'),
@@ -41,7 +41,7 @@ with app.app_context():
             TypeHebergement(nom='Espace Bien Être', description='Spa')
         ]
         db.session.add_all(types); db.session.commit()
-    # Initialisation Admin
+    # Init Admin
     if User.query.filter_by(username='admin').first() is None:
         admin = User(username='admin', email='admin@lephare.com', role='admin', must_change_password=False)
         admin.set_password('admin123')
@@ -76,7 +76,7 @@ def logout():
 def change_password():
     if request.method == 'POST':
         new_pwd = request.form.get('new_password')
-        if new_pwd != request.form.get('confirm_password'): flash('Erreur de confirmation', 'danger')
+        if new_pwd != request.form.get('confirm_password'): flash('Les mots de passe ne correspondent pas.', 'danger')
         elif len(new_pwd) < 6: flash('Trop court (min 6)', 'danger')
         else:
             current_user.set_password(new_pwd); current_user.must_change_password = False
@@ -162,7 +162,7 @@ def signaler_incident(hebergement_id):
         db.session.add(i); heb.statut = 'probleme' if request.form.get('type_incident') == 'urgence' else 'alerte'
         db.session.commit()
         if i.assigne_a: send_assignment_email(i, db.session.get(User, i.assigne_a))
-        flash('Signalé !', 'success'); return redirect(url_for('hebergements'))
+        flash('Incident signalé !', 'success'); return redirect(url_for('hebergements'))
     return render_template('incident.html', hebergement=heb, techniciens=techs)
 
 # ===================== ADMINISTRATION TYPES =====================
@@ -189,7 +189,9 @@ def edit_type(id):
 @login_required
 def delete_type(id):
     t = db.session.get(TypeHebergement, id)
-    db.session.delete(t); db.session.commit(); return redirect(url_for('types'))
+    if t.hebergements: flash('Utilisé !', 'danger')
+    else: db.session.delete(t); db.session.commit(); flash('Supprimé', 'warning')
+    return redirect(url_for('types'))
 
 # ===================== ADMINISTRATION UTILISATEURS =====================
 
@@ -201,29 +203,42 @@ def admin_users():
 @app.route('/admin/users/add', methods=['POST'])
 @login_required
 def add_user():
+    if current_user.role != 'admin': return redirect(url_for('dashboard'))
     username, email, role = request.form.get('username'), request.form.get('email'), request.form.get('role')
-    if User.query.filter(or_(User.username==username, User.email==email)).first(): flash('Existe déjà', 'danger')
+    
+    if User.query.filter(or_(User.username==username, User.email==email)).first():
+        flash('Existe déjà', 'danger')
     else:
-        # MOT DE PASSE UNIQUE GÉNÉRÉ ICI
-        pwd = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
-        u = User(username=username, email=email, role=role, must_change_password=True); u.set_password(pwd)
-        db.session.add(u); db.session.commit()
-        send_welcome_email(u, pwd) # ENVOI DU MÊME PWD
-        flash(f'Créé !', 'success')
+        # --- FIX MOT DE PASSE : ON LE GÉNÈRE UNE SEULE FOIS DANS UNE VARIABLE ---
+        password_en_clair = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+        
+        u = User(username=username, email=email, role=role, must_change_password=True)
+        u.set_password(password_en_clair) # On hache pour la base
+        
+        db.session.add(u)
+        db.session.commit()
+        
+        # ON ENVOIE LA MÊME VARIABLE AU MAIL
+        send_welcome_email(u, password_en_clair)
+        flash(f'Créé avec succès ! Mot de passe envoyé : {password_en_clair}', 'success')
+        
     return redirect(url_for('admin_users'))
 
 @app.route('/admin/users/edit/<int:id>', methods=['POST'])
 @login_required
 def edit_user(id):
+    if current_user.role != 'admin': return redirect(url_for('dashboard'))
     u = db.session.get(User, id)
     u.role = request.form.get('role')
-    if request.form.get('password'): u.set_password(request.form.get('password')); u.must_change_password = True
+    if request.form.get('password'): 
+        u.set_password(request.form.get('password'))
+        u.must_change_password = True
     db.session.commit(); flash('Mis à jour', 'success'); return redirect(url_for('admin_users'))
 
 @app.route('/admin/users/delete/<int:id>')
 @login_required
 def delete_user(id):
-    if id != current_user.id:
+    if current_user.role == 'admin' and id != current_user.id:
         u = db.session.get(User, id); db.session.delete(u); db.session.commit(); flash('Supprimé', 'warning')
     return redirect(url_for('admin_users'))
 
@@ -233,6 +248,10 @@ def debug_reset_admin():
     if u: db.session.delete(u); db.session.commit()
     a = User(username='admin', email='admin@lephare.com', role='admin', must_change_password=False); a.set_password('admin123')
     db.session.add(a); db.session.commit(); return "✅ OK"
+
+@app.route('/api/status')
+def api_status():
+    return jsonify({'status': 'online' if os.environ.get('RENDER') else 'local'})
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
