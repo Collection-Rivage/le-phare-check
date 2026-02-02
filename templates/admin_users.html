@@ -5,7 +5,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="bi bi-people-fill"></i> Gestion des utilisateurs</h2>
     <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addUserModal">
-        <i class="bi bi-person-plus"></i> Ajouter un utilisateur
+        <i class="bi bi-person-plus"></i> Inviter un utilisateur
     </button>
 </div>
 
@@ -44,16 +44,10 @@
                                 <i class="bi bi-pencil"></i> Modifier
                             </button>
                             {% if user.id != current_user.id %}
-                                {% if user.role == 'admin' and admin_count == 1 %}
-                                <button class="btn btn-danger btn-sm" disabled title="Impossible : il doit rester au moins un administrateur">
-                                    <i class="bi bi-trash"></i> Supprimer
-                                </button>
-                                {% else %}
                                 <a href="{{ url_for('delete_user', id=user.id) }}" class="btn btn-danger btn-sm" 
                                    onclick="return confirm('Êtes-vous sûr de vouloir supprimer {{ user.username }} ?')">
                                     <i class="bi bi-trash"></i> Supprimer
                                 </a>
-                                {% endif %}
                             {% else %}
                             <button class="btn btn-danger btn-sm" disabled title="Tu ne peux pas te supprimer toi-même">
                                 <i class="bi bi-trash"></i> Supprimer
@@ -90,10 +84,10 @@
                             </option>
                         </select>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Nouveau mot de passe (optionnel)</label>
+                    <div class="mb-3 border-top pt-3">
+                        <label class="form-label fw-bold">Forcer un nouveau mot de passe (optionnel)</label>
                         <input type="password" name="password" class="form-control" placeholder="Laisser vide pour ne pas modifier">
-                        <small class="text-muted">Minimum 8 caractères</small>
+                        <small class="text-muted">Si vous remplissez ce champ, l'utilisateur devra changer son mot de passe à sa prochaine connexion.</small>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -106,27 +100,23 @@
 </div>
 {% endfor %}
 
-<!-- Modal d'ajout d'utilisateur -->
+<!-- Modal d'ajout d'utilisateur (VERSION SIMPLIFIÉE SANS MDP) -->
 <div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="addUserModalLabel">Ajouter un nouvel utilisateur</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="addUserModalLabel"><i class="bi bi-person-plus"></i> Nouvel utilisateur</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" action="{{ url_for('add_user') }}">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label fw-bold">Nom d'utilisateur</label>
-                        <input type="text" name="username" class="form-control" required placeholder="Ex: jean.dupont">
+                        <input type="text" name="username" class="form-control" required placeholder="Ex: j.dupont">
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Email</label>
                         <input type="email" name="email" class="form-control" required placeholder="Ex: jean.dupont@lephare.com">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Mot de passe</label>
-                        <input type="password" name="password" class="form-control" required placeholder="Minimum 8 caractères">
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Rôle de l'utilisateur</label>
@@ -134,15 +124,19 @@
                             <option value="technicien" selected>Technicien</option>
                             <option value="accueil">Accueil</option>
                             <option value="direction">Direction</option>
-                            <option value="admin">
-                                Administrateur <span class="text-danger small">(Accès total à l'application)</span>
-                            </option>
+                            <option value="admin">Administrateur</option>
                         </select>
+                    </div>
+                    
+                    <!-- Note informative -->
+                    <div class="alert alert-info py-2 px-3 mt-4 mb-0">
+                        <i class="bi bi-info-circle-fill me-2"></i>
+                        <small>Un mot de passe provisoire sera généré et envoyé automatiquement par email à l'utilisateur.</small>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                    <button type="submit" class="btn btn-success">Créer l'utilisateur</button>
+                    <button type="submit" class="btn btn-success">Envoyer l'invitation</button>
                 </div>
             </form>
         </div>
