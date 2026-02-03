@@ -242,12 +242,6 @@ def delete_user(id):
         u = db.session.get(User, id); db.session.delete(u); db.session.commit(); flash('Supprimé', 'warning')
     return redirect(url_for('admin_users'))
 
-@app.route('/debug-reset-admin')
-def debug_reset_admin():
-    u = User.query.filter_by(username='admin').first()
-    if u: db.session.delete(u); db.session.commit()
-    a = User(username='admin', email='admin@lephare.com', role='admin', must_change_password=False); a.set_password('admin123')
-    db.session.add(a); db.session.commit(); return "✅ OK"
 
 @app.route('/api/status')
 def api_status():
