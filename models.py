@@ -6,7 +6,7 @@ from datetime import datetime
 db = SQLAlchemy()
 
 class User(db.Model, UserMixin):
-    __tablename__ = 'user'
+    __tablename__ = 'users' # CHANGÉ EN PLURIEL
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
@@ -43,7 +43,7 @@ class Check(db.Model):
     __tablename__ = 'checks'
     id = db.Column(db.Integer, primary_key=True)
     hebergement_id = db.Column(db.Integer, db.ForeignKey('hebergements.id'), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False) # CHANGÉ
     electricite = db.Column(db.Boolean, default=True)
     plomberie = db.Column(db.Boolean, default=True)
     chauffage = db.Column(db.Boolean, default=True)
@@ -63,8 +63,8 @@ class Incident(db.Model):
     type_incident = db.Column(db.String(50))
     description = db.Column(db.Text)
     statut = db.Column(db.String(20), default='ouvert')
-    assigne_a = db.Column(db.Integer, db.ForeignKey('user.id'))
-    cree_par = db.Column(db.Integer, db.ForeignKey('user.id'))
+    assigne_a = db.Column(db.Integer, db.ForeignKey('users.id')) # CHANGÉ
+    cree_par = db.Column(db.Integer, db.ForeignKey('users.id')) # CHANGÉ
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     hebergement = db.relationship('Hebergement', backref='incidents')
