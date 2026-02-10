@@ -6,7 +6,7 @@ from datetime import datetime
 db = SQLAlchemy()
 
 class User(db.Model, UserMixin):
-    __tablename__ = 'users' # CHANGÉ EN PLURIEL
+    __tablename__ = 'user'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
@@ -35,15 +35,22 @@ class Hebergement(db.Model):
 class TypeHebergement(db.Model):
     __tablename__ = 'type_hebergement'
     id = db.Column(db.Integer, primary_key=True)
-    nom = db.Column(db.String(50), unique=True, nullable=False)
+    # 🔥 SUPPRESSION DE unique=True pour permettre les doublons de nom
+    nom = db.Column(db.String(50), nullable=False)
     description = db.Column(db.Text)
     hebergements = db.relationship('Hebergement', backref='type_hebergement', lazy=True)
+    
+    # Pour afficher proprement dans les listes (nom + description)
+    def __repr__(self):
+        if self.description:
+            return f"{self.nom} ({self.description})"
+        return self.nom
 
 class Check(db.Model):
     __tablename__ = 'checks'
     id = db.Column(db.Integer, primary_key=True)
     hebergement_id = db.Column(db.Integer, db.ForeignKey('hebergements.id'), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False) # CHANGÉ
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     electricite = db.Column(db.Boolean, default=True)
     plomberie = db.Column(db.Boolean, default=True)
     chauffage = db.Column(db.Boolean, default=True)
@@ -63,8 +70,12 @@ class Incident(db.Model):
     type_incident = db.Column(db.String(50))
     description = db.Column(db.Text)
     statut = db.Column(db.String(20), default='ouvert')
-    assigne_a = db.Column(db.Integer, db.ForeignKey('users.id')) # CHANGÉ
-    cree_par = db.Column(db.Integer, db.ForeignKey('users.id')) # CHANGÉ
+    assigne_a = db.Column(db.Integer, db.ForeignKey('user.id'))
+    cree_par = db.Column(db.Integer, db.ForeignKey('user.id'))
+    date_resolution = db.Column(db.DateTime, nullable=True)
+    resolu_par_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     hebergement = db.relationship('Hebergement', backref='incidents')
+    technicien = db.relationship('User', foreign_keys=[assigne_a], backref='incidents_assignes')
+    resolu_par = db.relationship('User', foreign_keys=[resolu_par_id], backref='incidents_resolus')

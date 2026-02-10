@@ -143,13 +143,25 @@
         </div>
 
         <div class="mt-auto d-grid gap-2">
-          <a href="{{ url_for('check', hebergement_id=heb.id) }}" class="btn btn-primary btn-sm">
-            <i class="bi bi-clipboard-check"></i> Faire un check
-          </a>
-          <a href="{{ url_for('signaler_incident', hebergement_id=heb.id) }}" class="btn btn-danger btn-sm">
-            <i class="bi bi-exclamation-triangle-fill"></i> Signaler un problème
-          </a>
-        </div>
+  <a href="{{ url_for('check', hebergement_id=heb.id) }}" class="btn btn-primary btn-sm">
+    <i class="bi bi-clipboard-check"></i> Faire un check
+  </a>
+  
+  {# BOUTON VOIR LES PROBLÈMES - s'affiche uniquement s'il y a des incidents ouverts #}
+  {% set nb_problemes = heb.incidents|selectattr("statut", "equalto", "ouvert")|list|length %}
+  {% if nb_problemes > 0 %}
+    <a href="{{ url_for('voir_problemes', hebergement_id=heb.id) }}" 
+       class="btn btn-danger btn-sm">
+      🚨 Voir {{ nb_problemes }} problème{% if nb_problemes > 1 %}s{% endif %}
+    </a>
+  {% endif %}
+  
+  {# BOUTON SIGNALER - toujours visible #}
+  <a href="{{ url_for('signaler_incident', hebergement_id=heb.id) }}" 
+     class="btn btn-outline-danger btn-sm">
+    <i class="bi bi-exclamation-triangle-fill"></i> Signaler un problème
+  </a>
+</div>
 
         {% if current_user.role == 'admin' %}
         <div class="mt-2 d-flex gap-2">
@@ -277,7 +289,7 @@
               <label class="form-label">Type</label>
               <select class="form-select" name="type_id" required>
                 {% for t in types %}
-                <option value="{{ t.id }}">{{ t.nom }}</option>
+                <option value="{{ t.id }}">{{ t }}</option>
                 {% endfor %}
               </select>
             </div>
