@@ -1,9 +1,11 @@
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, current_app
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from markupsafe import Markup
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from config import Config
 from models import db, User, Hebergement, Check, TypeHebergement, Incident
 from mail import mail, send_welcome_email, send_assignment_email
+
 
 from sqlalchemy.orm import selectinload, joinedload
 from flask_migrate import Migrate
@@ -542,11 +544,10 @@ def admin_users():
         return redirect(url_for('dashboard'))
     users = User.query.order_by(desc(User.created_at)).all()
     return render_template('admin_users.html', users=users)
-
 @app.route('/admin/users/add', methods=['POST'])
 @login_required
 def add_user():
-    """Création d'un utilisateur avec gestion d'erreur email"""
+    """Création d'un utilisateur - Email asynchrone"""
     if current_user.role != 'admin':
         flash('Accès refusé', 'danger')
         return redirect(url_for('dashboard'))
@@ -572,14 +573,25 @@ def add_user():
     db.session.add(u)
     db.session.commit()
     
-    # Envoi email (non bloquant)
-    try:
-        send_welcome_email(u, password_en_clair)
-        flash(f'✅ Utilisateur créé et email envoyé à {email}', 'success')
-    except Exception as e:
-        print(f"Erreur email: {e}")
-        flash(f'⚠️ Utilisateur créé mais email NON envoyé', 'warning')
-        flash(f'🔑 Mot de passe temporaire : {password_en_clair} (notez-le !)', 'info')
+    # Envoi email dans un thread séparé (non bloquant)
+    import threading
+    def send_async_email(app, user, password):
+        with app.app_context():
+            try:
+                send_welcome_email(user, password)
+                print(f"Email envoyé à {user.email}")
+            except Exception as e:
+                print(f"Erreur email (async): {e}")
+    
+    # Lancer l'envoi d'email en arrière-plan
+    threading.Thread(
+        target=send_async_email,
+        args=(current_app._get_current_object(), u, password_en_clair)
+    ).start()
+    
+    flash(f'✅ Utilisateur {username} créé avec succès !', 'success')
+    flash(f'📧 Un email avec les identifiants a été envoyé à {email}', 'info')
+    flash(f'🔑 Mot de passe temporaire (au cas où) : {password_en_clair}', 'warning')
     
     return redirect(url_for('admin_users'))
 
