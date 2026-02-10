@@ -261,6 +261,9 @@ def edit_hebergement(id):
     if current_user.role != 'admin':
         return redirect(url_for('hebergements'))
     h = db.session.get(Hebergement, id)
+    if not h:
+        flash('Hébergement introuvable', 'danger')
+        return redirect(url_for('hebergements'))
     h.emplacement = request.form.get('emplacement')
     h.type_id = request.form.get('type_id')
     h.numero_chassis = request.form.get('numero_chassis')
@@ -276,6 +279,9 @@ def delete_hebergement(id):
     if current_user.role != 'admin':
         return redirect(url_for('hebergements'))
     h = db.session.get(Hebergement, id)
+    if not h:
+        flash('Hébergement introuvable', 'danger')
+        return redirect(url_for('hebergements'))
     db.session.delete(h)
     db.session.commit()
     flash('Supprimé', 'warning')
@@ -287,6 +293,9 @@ def delete_hebergement(id):
 @login_required
 def check(hebergement_id):
     heb = db.session.get(Hebergement, hebergement_id)
+    if not heb:
+        flash('Hébergement introuvable', 'danger')
+        return redirect(url_for('hebergements'))
     if request.method == 'POST':
         c = Check(
             hebergement_id=hebergement_id,
@@ -330,7 +339,7 @@ def signaler_incident(hebergement_id):
         flash('Hébergement non trouvé', 'danger')
         return redirect(url_for('hebergements'))
     
-    # VIDER LE CACHE pour forcer la relecture depuis PostgreSQL
+    # Vider le cache pour forcer la relecture depuis PostgreSQL
     db.session.expire_all()
     
     # Charger les techniciens frais
@@ -338,7 +347,7 @@ def signaler_incident(hebergement_id):
         User.role.in_(['technicien', 'admin'])
     ).order_by(User.username).all()
     
-    # Liste des IDs valides récupérés fraîchement
+    # Liste des IDs valides
     valid_ids = {t.id for t in techs}
     
     if request.method == 'POST':
@@ -480,6 +489,9 @@ def types():
 @app.route('/types/add', methods=['POST'])
 @login_required
 def add_type():
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('types'))
     t = TypeHebergement(nom=request.form.get('nom'), description=request.form.get('description'))
     db.session.add(t)
     db.session.commit()
@@ -489,7 +501,13 @@ def add_type():
 @app.route('/types/edit/<int:id>', methods=['POST'])
 @login_required
 def edit_type(id):
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('types'))
     t = db.session.get(TypeHebergement, id)
+    if not t:
+        flash('Type introuvable', 'danger')
+        return redirect(url_for('types'))
     t.nom = request.form.get('nom')
     t.description = request.form.get('description')
     db.session.commit()
@@ -499,7 +517,13 @@ def edit_type(id):
 @app.route('/types/delete/<int:id>')
 @login_required
 def delete_type(id):
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('types'))
     t = db.session.get(TypeHebergement, id)
+    if not t:
+        flash('Type introuvable', 'danger')
+        return redirect(url_for('types'))
     if t.hebergements:
         flash('Type utilisé ! Impossible de supprimer.', 'danger')
     else:
@@ -513,45 +537,76 @@ def delete_type(id):
 @app.route('/admin/users')
 @login_required
 def admin_users():
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('dashboard'))
     users = User.query.order_by(desc(User.created_at)).all()
     return render_template('admin_users.html', users=users)
 
 @app.route('/admin/users/add', methods=['POST'])
 @login_required
 def add_user():
+    """Création d'un utilisateur avec gestion d'erreur email"""
     if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
         return redirect(url_for('dashboard'))
     
     username = request.form.get('username')
     email = request.form.get('email')
     role = request.form.get('role')
     
+    # Vérifications
+    if not username or not email:
+        flash('Nom d\'utilisateur et email requis', 'danger')
+        return redirect(url_for('admin_users'))
+    
+    # Vérifier si existe déjà
     if User.query.filter(or_(User.username == username, User.email.ilike(email))).first():
         flash('Utilisateur existe déjà', 'danger')
-    else:
-        password_en_clair = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
-        u = User(username=username, email=email, role=role, must_change_password=True)
-        u.set_password(password_en_clair)
-        db.session.add(u)
-        db.session.commit()
-        try:
-            send_welcome_email(u, password_en_clair)
-            flash('Créé avec succès ! Email envoyé.', 'success')
-        except:
-            flash('Créé mais email non envoyé', 'warning')
-        
+        return redirect(url_for('admin_users'))
+    
+    # Création
+    password_en_clair = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+    u = User(username=username, email=email, role=role, must_change_password=True)
+    u.set_password(password_en_clair)
+    db.session.add(u)
+    db.session.commit()
+    
+    # Envoi email (non bloquant)
+    try:
+        send_welcome_email(u, password_en_clair)
+        flash(f'✅ Utilisateur créé et email envoyé à {email}', 'success')
+    except Exception as e:
+        print(f"Erreur email: {e}")
+        flash(f'⚠️ Utilisateur créé mais email NON envoyé', 'warning')
+        flash(f'🔑 Mot de passe temporaire : {password_en_clair} (notez-le !)', 'info')
+    
     return redirect(url_for('admin_users'))
 
 @app.route('/admin/users/edit/<int:id>', methods=['POST'])
 @login_required
 def edit_user(id):
+    """Modification d'un utilisateur"""
     if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
         return redirect(url_for('dashboard'))
+    
     u = db.session.get(User, id)
+    if not u:
+        flash('Utilisateur introuvable', 'danger')
+        return redirect(url_for('admin_users'))
+    
+    # Empêcher de modifier son propre rôle
+    if id == current_user.id and request.form.get('role') != current_user.role:
+        flash('Vous ne pouvez pas modifier votre propre rôle', 'danger')
+        return redirect(url_for('admin_users'))
+    
     u.role = request.form.get('role')
     if request.form.get('password'):
         u.set_password(request.form.get('password'))
         u.must_change_password = True
+        flash('Mot de passe réinitialisé', 'success')
+    
     db.session.commit()
     flash('Mis à jour', 'success')
     return redirect(url_for('admin_users'))
@@ -559,11 +614,30 @@ def edit_user(id):
 @app.route('/admin/users/delete/<int:id>')
 @login_required
 def delete_user(id):
-    if current_user.role == 'admin' and id != current_user.id:
-        u = db.session.get(User, id)
+    """Suppression d'un utilisateur avec vérifications"""
+    if current_user.role != 'admin':
+        flash('Accès refusé', 'danger')
+        return redirect(url_for('admin_users'))
+    
+    # Empêcher de se supprimer soi-même
+    if id == current_user.id:
+        flash('Vous ne pouvez pas vous supprimer vous-même !', 'danger')
+        return redirect(url_for('admin_users'))
+    
+    # Vérifier que l'utilisateur existe
+    u = db.session.get(User, id)
+    if not u:
+        flash('Utilisateur introuvable', 'danger')
+        return redirect(url_for('admin_users'))
+    
+    try:
         db.session.delete(u)
         db.session.commit()
         flash('Supprimé', 'warning')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erreur lors de la suppression: {str(e)}', 'danger')
+    
     return redirect(url_for('admin_users'))
 
 @app.route('/api/status')
