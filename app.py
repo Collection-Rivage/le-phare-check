@@ -547,7 +547,7 @@ def admin_users():
 @app.route('/admin/users/add', methods=['POST'])
 @login_required
 def add_user():
-    """Création d'un utilisateur - Email asynchrone"""
+    """Création d'un utilisateur"""
     if current_user.role != 'admin':
         flash('Accès refusé', 'danger')
         return redirect(url_for('dashboard'))
@@ -565,6 +565,24 @@ def add_user():
     if User.query.filter(or_(User.username == username, User.email.ilike(email))).first():
         flash('Utilisateur existe déjà', 'danger')
         return redirect(url_for('admin_users'))
+    
+    # Création
+    password_en_clair = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+    u = User(username=username, email=email, role=role, must_change_password=True)
+    u.set_password(password_en_clair)
+    db.session.add(u)
+    db.session.commit()
+    
+    # Tentative d'envoi email (sans bloquer)
+    try:
+        send_welcome_email(u, password_en_clair)
+        flash(f'✅ Utilisateur {username} créé et email envoyé !', 'success')
+    except Exception as e:
+        print(f"Erreur email: {e}")
+        flash(f'✅ Utilisateur {username} créé !', 'success')
+        flash(f'🔑 Mot de passe à transmettre : {password_en_clair}', 'warning')
+    
+    return redirect(url_for('admin_users'))
     
     # Création
     password_en_clair = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
