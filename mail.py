@@ -2,7 +2,7 @@
 import resend
 
 # COLLE TA CLÉ RESEND ICI (celle qui commence par re_)
-resend.api_key = re_MK4pWNHu_3176dxmyuYA77kQDFz78Z6tY
+resend.api_key = 're_MK4pWNHu_3176dxmyuYA77kQDFz78Z6tY'
 
 def send_welcome_email(user, password):
     app_url = "https://le-phare-check.onrender.com"
