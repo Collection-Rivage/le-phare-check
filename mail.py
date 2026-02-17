@@ -1,13 +1,18 @@
-# mail.py - Version Brevo (Solution de secours fiable)
+import os  # Ajoute ça tout en haut du fichier si ce n'est pas déjà fait
 import sib_api_v3_sdk
 from sib_api_v3_sdk.rest import ApiException
 
-# === COLLE TA CLÉ BREVO ICI (celle qui commence par xkeysib-) ===
-API_KEY = "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" 
+# On récupère la clé depuis les variables d'environnement de Render (SECRET)
+API_KEY = os.environ.get("BREVO_API_KEY") 
+
+if not API_KEY:
+    print("⚠️ ERREUR : La variable BREVO_API_KEY n'est pas définie sur Render !")
 
 configuration = sib_api_v3_sdk.Configuration()
 configuration.api_key['api-key'] = API_KEY
 api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
+
+# ... le reste du fichier ne change pas ...
 
 def send_welcome_email(user, password):
     app_url = "https://le-phare-check.onrender.com"
