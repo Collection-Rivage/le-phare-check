@@ -3,7 +3,7 @@ import sib_api_v3_sdk
 from sib_api_v3_sdk.rest import ApiException
 
 # === COLLE TA CLÉ BREVO ICI (celle qui commence par xkeysib-) ===
-API_KEY = "xsmtpsib-2b4db7b15ad4e38ed80adc16700aeb1fb7ae39f69bf73b0dfa9b5ef0d172943b-ddu71NUUzMNGJWmq" 
+API_KEY = "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" 
 
 configuration = sib_api_v3_sdk.Configuration()
 configuration.api_key['api-key'] = API_KEY
