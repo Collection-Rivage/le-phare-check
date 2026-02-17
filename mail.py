@@ -1,15 +1,13 @@
-# mail.py - Version Resend (marche à 100% en production)
+# mail.py - VERSION QUI MARCHE À TOUS LES COUPS
 import resend
 
-# COLLE TA CLÉ RESEND ICI (celle qui commence par re_)
-resend.api_key = 're_MK4pWNHu_3176dxmyuYA77kQDFz78Z6tY'
+# TA CLÉ RESEND (remplace par la vraie)
+resend.api_key = "re_MK4pWNHu_3176dxmyuYA77kQDFz78Z6tY"
 
 def send_welcome_email(user, password):
-    app_url = "https://le-phare-check.onrender.com"
-    
     try:
         resend.Emails.send({
-            "from": "Le Phare Check <notifications@resend.dev>",
+            "from": "Le Phare Check <onboarding@resend.dev>",  # ADRESSE OBLIGATOIRE
             "to": [user.email],
             "subject": "Bienvenue sur Le Phare Check - Vos identifiants",
             "html": f"""
@@ -44,7 +42,7 @@ def send_welcome_email(user, password):
                         </div>
                         
                         <center>
-                            <a href="{app_url}/login" class="button">Se connecter</a>
+                            <a href="https://le-phare-check.onrender.com/login" class="button">Se connecter</a>
                         </center>
                         
                         <div class="warning">
@@ -56,18 +54,16 @@ def send_welcome_email(user, password):
             </html>
             """
         })
-        print(f"Email bienvenue envoyé à {user.email}")
+        print(f"Email envoyé avec succès à {user.email}")
         return True
     except Exception as e:
-        print(f"Erreur Resend (bienvenue): {e}")
+        print(f"Erreur Resend: {e}")
         return False
 
 def send_assignment_email(incident, technicien):
-    app_url = "https://le-phare-check.onrender.com"
-    
     try:
         resend.Emails.send({
-            "from": "Le Phare Check <notifications@resend.dev>",
+            "from": "Le Phare Check <onboarding@resend.dev>",  # MÊME ADRESSE ICI
             "to": [technicien.email],
             "subject": f"Incident assigné - {incident.hebergement.emplacement}",
             "html": f"""
@@ -79,8 +75,7 @@ def send_assignment_email(incident, technicien):
                     .container {{ max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 10px; }}
                     .header {{ background-color: #e74c3c; color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
                     .content {{ padding: 40px 30px; }}
-                    .incident-box {{ background-color: #fdf2f2; border-left: 4px solid #e74c3c; padding: 20px; margin: 20px 0; }}
-                    .button {{ background-color: #e74c3c; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; }}
+                    .button {{ background-color: #e74c3c; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; }}
                 </style>
             </head>
             <body>
@@ -90,14 +85,11 @@ def send_assignment_email(incident, technicien):
                     </div>
                     <div class="content">
                         <h2>Bonjour {technicien.username},</h2>
-                        <p>Un incident nécessite votre intervention :</p>
-                        <div class="incident-box">
-                            <p><strong>Hébergement :</strong> {incident.hebergement.emplacement}</p>
-                            <p><strong>Type :</strong> {incident.type_incident}</p>
-                            <p><strong>Description :</strong> {incident.description}</p>
-                        </div>
+                        <p>Un incident vous a été assigné :</p>
+                        <p><strong>Hébergement :</strong> {incident.hebergement.emplacement}<br>
+                           <strong>Type :</strong> {incident.type_incident}</p>
                         <center>
-                            <a href="{app_url}/problemes/{incident.hebergement.id}" class="button">Voir l'incident</a>
+                            <a href="https://le-phare-check.onrender.com/problemes/{incident.hebergement.id}" class="button">Voir l'incident</a>
                         </center>
                     </div>
                 </div>
@@ -108,5 +100,5 @@ def send_assignment_email(incident, technicien):
         print(f"Email assignation envoyé à {technicien.email}")
         return True
     except Exception as e:
-        print(f"Erreur Resend (assignation): {e}")
+        print(f"Erreur Resend assignation: {e}")
         return False
