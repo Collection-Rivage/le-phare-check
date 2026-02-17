@@ -672,6 +672,26 @@ def delete_user(id):
 @app.route('/api/status')
 def api_status():
     return jsonify({'status': 'online' if os.environ.get("RENDER") else 'local'})
+    
+# --- ROUTE TEMPORAIRE POUR DÉBLOQUER RESEND ---
+@app.route('/debloquer-resend')
+def debloquer_resend():
+    try:
+        import resend
+        # On utilise TA clé API déjà définie dans mail.py ou on la remet ici si besoin
+        # Assure-toi que resend.api_key est bien défini au début de app.py ou importe-le
+        
+        # Si tu as déjà importé resend dans app.py, sinon ajoute : import resend
+        
+        info = resend.Emails.send({
+            "from": "stephane@lephare-iledere.com",  # TON EMAIL EXACT
+            "to": ["stephane@lephare-iledere.com"],  # TON EMAIL EXACT
+            "subject": "TEST DEBLOCAGE RESEND",
+            "html": "<h1>Si tu reçois ça, c'est gagné !</h1><p>Ton compte Resend est maintenant actif.</p>"
+        })
+        return f"✅ Mail envoyé avec succès ! ID: {info['id']}"
+    except Exception as e:
+        return f"❌ Erreur : {str(e)}"
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
