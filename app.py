@@ -4,7 +4,7 @@ from markupsafe import Markup
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from config import Config
 from models import db, User, Hebergement, Check, TypeHebergement, Incident
-from mail import mail, send_welcome_email, send_assignment_email
+from mail import send_welcome_email, send_assignment_email
 
 
 from sqlalchemy.orm import selectinload, joinedload
@@ -21,7 +21,6 @@ app.config.from_object(Config)
 
 # ===================== INITIALISATION =====================
 db.init_app(app)
-mail.init_app(app)
 migrate = Migrate(app, db)
 
 login_manager = LoginManager()

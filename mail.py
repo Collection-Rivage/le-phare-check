@@ -9,7 +9,7 @@ def send_welcome_email(user, password):
     
     try:
         resend.Emails.send({
-            "from": "Le Phare Check <no-reply@lepharecheck.fr>",
+            "from": "Le Phare Check <onboarding@resend.dev>",
             "to": [user.email],
             "subject": "Bienvenue sur Le Phare Check - Vos identifiants",
             "html": f"""
@@ -67,7 +67,7 @@ def send_assignment_email(incident, technicien):
     
     try:
         resend.Emails.send({
-            "from": "Le Phare Check <no-reply@lepharecheck.fr>",
+            "from": "Le Phare Check <onboarding@resend.dev>",
             "to": [technicien.email],
             "subject": f"Incident assigné - {incident.hebergement.emplacement}",
             "html": f"""
