@@ -543,7 +543,8 @@ def admin_users():
         return redirect(url_for('dashboard'))
     users = User.query.order_by(desc(User.created_at)).all()
     return render_template('admin_users.html', users=users)
-@app.route('/admin/users/add', methods=['POST'])
+
+    @app.route('/admin/users/add', methods=['POST'])
 @login_required
 def add_user():
     """Création d'un utilisateur"""
@@ -572,46 +573,18 @@ def add_user():
     db.session.add(u)
     db.session.commit()
     
-    # Tentative d'envoi email (sans bloquer)
+    # Tentative d'envoi email (sans bloquer l'affichage)
     try:
         send_welcome_email(u, password_en_clair)
         flash(f'✅ Utilisateur {username} créé et email envoyé !', 'success')
     except Exception as e:
         print(f"Erreur email: {e}")
+        # On affiche quand même que l'utilisateur est créé, même si le mail échoue
         flash(f'✅ Utilisateur {username} créé !', 'success')
-        flash(f'🔑 Mot de passe à transmettre : {password_en_clair}', 'warning')
+        flash(f'⚠️ Erreur envoi email (vérifiez la config Resend). Mot de passe : {password_en_clair}', 'warning')
     
     return redirect(url_for('admin_users'))
-    
-    # Création
-    password_en_clair = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
-    u = User(username=username, email=email, role=role, must_change_password=True)
-    u.set_password(password_en_clair)
-    db.session.add(u)
-    db.session.commit()
-    
-    # Envoi email dans un thread séparé (non bloquant)
-    import threading
-    def send_async_email(app, user, password):
-        with app.app_context():
-            try:
-                send_welcome_email(user, password)
-                print(f"Email envoyé à {user.email}")
-            except Exception as e:
-                print(f"Erreur email (async): {e}")
-    
-    # Lancer l'envoi d'email en arrière-plan
-    threading.Thread(
-        target=send_async_email,
-        args=(current_app._get_current_object(), u, password_en_clair)
-    ).start()
-    
-    flash(f'✅ Utilisateur {username} créé avec succès !', 'success')
-    flash(f'📧 Un email avec les identifiants a été envoyé à {email}', 'info')
-    flash(f'🔑 Mot de passe temporaire (au cas où) : {password_en_clair}', 'warning')
-    
-    return redirect(url_for('admin_users'))
-
+   
 @app.route('/admin/users/edit/<int:id>', methods=['POST'])
 @login_required
 def edit_user(id):
