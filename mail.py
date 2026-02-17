@@ -7,7 +7,7 @@ resend.api_key = "re_MK4pWNHu_3176dxmyuYA77kQDFz78Z6tY"
 def send_welcome_email(user, password):
     try:
         resend.Emails.send({
-            "from": "Le Phare Check <onboarding@resend.dev>",  # ADRESSE OBLIGATOIRE
+            "from": "stephane@lephare-iledere.com",
             "to": [user.email],
             "subject": "Bienvenue sur Le Phare Check - Vos identifiants",
             "html": f"""
@@ -63,7 +63,7 @@ def send_welcome_email(user, password):
 def send_assignment_email(incident, technicien):
     try:
         resend.Emails.send({
-            "from": "Le Phare Check <onboarding@resend.dev>",  # MÊME ADRESSE ICI
+            "from": "stephane@lephare-iledere.com",
             "to": [technicien.email],
             "subject": f"Incident assigné - {incident.hebergement.emplacement}",
             "html": f"""
