@@ -635,5 +635,46 @@ def delete_user(id):
 def api_status():
     return jsonify({'status': 'online' if os.environ.get("RENDER") else 'local'})
 
+# --- ROUTE TEMPORAIRE DE NETTOYAGE (À SUPPRIMER APRÈS USAGE) ---
+@app.route('/nettoyer-utilisateurs')
+def route_nettoyer_utilisateurs():
+    # Sécurité basique : uniquement en local ou si tu es sûr, sinon ajoute un mot de passe
+    try:
+        from models import User, Incident
+        
+        print("🧹 Démarrage du nettoyage via route web...")
+        msg = []
+        
+        # 1. Mettre à NULL les assignations orphelines d'abord
+        all_incidents = Incident.query.all()
+        valid_user_ids = {u.id for u in User.query.all()}
+        fixed_count = 0
+        
+        for inc in all_incidents:
+            if inc.assigne_a and inc.assigne_a not in valid_user_ids:
+                inc.assigne_a = None
+                fixed_count += 1
+        
+        if fixed_count > 0:
+            db.session.commit()
+            msg.append(f"✅ Correction de {fixed_count} incidents orphelins.")
+        
+        # 2. Supprimer les utilisateurs de test (garder seulement 'admin')
+        users_to_delete = User.query.filter(User.username != 'admin').all()
+        count = len(users_to_delete)
+        
+        if count == 0:
+            msg.append("ℹ️ Aucun utilisateur à supprimer.")
+        else:
+            for u in users_to_delete:
+                db.session.delete(u)
+            db.session.commit()
+            msg.append(f"✅ Suppression de {count} utilisateurs de test.")
+            
+        return f"<h1>Nettoyage terminé !</h1><ul>{''.join(['<li>'+m+'</li>' for m in msg])}</ul><p><a href='/'>Retour à l'accueil</a></p>"
+        
+    except Exception as e:
+        return f"<h1>Erreur</h1><p>{str(e)}</p>"
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
