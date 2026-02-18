@@ -1,95 +1,132 @@
-import os  # Ajoute ça tout en haut du fichier si ce n'est pas déjà fait
-import sib_api_v3_sdk
-from sib_api_v3_sdk.rest import ApiException
+# mail.py - VERSION PROFESSIONNELLE & SÉCURISÉE
+import resend
+import os
 
-# On récupère la clé depuis les variables d'environnement de Render (SECRET)
-API_KEY = os.environ.get("BREVO_API_KEY") 
-
-if not API_KEY:
-    print("⚠️ ERREUR : La variable BREVO_API_KEY n'est pas définie sur Render !")
-
-configuration = sib_api_v3_sdk.Configuration()
-configuration.api_key['api-key'] = API_KEY
-api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
-
-# ... le reste du fichier ne change pas ...
+# 🔐 Clé API via variable d'environnement (NE JAMAIS POUSSER SUR GITHUB !)
+resend.api_key = os.getenv("RESEND_API_KEY")  # ← Configure dans Render > Environment
 
 def send_welcome_email(user, password):
-    app_url = "https://le-phare-check.onrender.com"
-    
-    subject = f"Bienvenue sur Le Phare Check - {user.username}"
-    
-    html_content = f"""
-    <html>
-    <body style="font-family: Arial, sans-serif; background:#f4f4f4; padding:20px;">
-        <div style="max-width:600px; margin:0 auto; background:white; border-radius:10px; overflow:hidden;">
-            <div style="background:#2c3e50; color:white; padding:30px; text-align:center;">
-                <h1>LE PHARE CHECK</h1>
-            </div>
-            <div style="padding:40px 30px;">
-                <h2>Bonjour {user.username},</h2>
-                <p>Stéphane vous invite à utiliser l'application.</p>
-                
-                <div style="background:#f8f9fa; border-left:4px solid #3498db; padding:20px; margin:25px 0;">
-                    <p><strong>Utilisateur :</strong> {user.username}</p>
-                    <p><strong>Mot de passe :</strong> <span style="background:#fff3cd; padding:5px 10px; border-radius:3px; font-family:monospace;">{password}</span></p>
-                </div>
-                
-                <center>
-                    <a href="{app_url}/login" style="background:#3498db; color:white; padding:15px 30px; text-decoration:none; border-radius:5px; font-weight:bold;">Se connecter</a>
-                </center>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-
-    send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
-        sender={"name": "Le Phare Check", "email": "stephane@lephare-iledere.com"},
-        to=[{"email": user.email, "name": user.username}],
-        subject=subject,
-        html_content=html_content
-    )
-
     try:
-        api_response = api_instance.send_transac_email(send_smtp_email)
-        print(f"✅ Email Brevo envoyé à {user.email} (ID: {api_response.message_id})")
+        resend.Emails.send({
+            "from": "Le Phare Check <contact@lephare-iledere.com>",  # ← Utilise ton domaine une fois vérifié
+            "to": [user.email],
+            "subject": "Bienvenue sur Le Phare Check — Vos identifiants",
+            "html": f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f7fa; margin: 0; padding: 20px; }}
+                    .container {{ max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow: hidden; }}
+                    .header {{ background: linear-gradient(135deg, #2c3e50, #1a252c); color: white; padding: 30px; text-align: center; }}
+                    .content {{ padding: 30px; line-height: 1.6; color: #333; }}
+                    .credentials {{ background-color: #f8f9fa; border-left: 4px solid #3498db; padding: 20px; margin: 20px 0; border-radius: 8px; }}
+                    .password {{ font-family: 'Courier New', Courier, monospace; background-color: #fff3cd; padding: 8px 12px; border-radius: 5px; font-size: 16px; color: #856404; font-weight: bold; }}
+                    .button {{ display: inline-block; background-color: #3498db; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 15px 0; }}
+                    .warning {{ background-color: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 15px; border-radius: 8px; margin-top: 20px; font-size: 14px; }}
+                    .footer {{ text-align: center; padding: 20px; color: #7f8c8d; font-size: 12px; border-top: 1px solid #ecf0f1; }}
+                    @media (max-width: 600px) {{
+                        .container {{ margin: 10px; }}
+                        .button {{ width: 100%; text-align: center; }}
+                    }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>LE PHARE CHECK</h1>
+                        <p>Collection Rivage — Gestion des hébergements</p>
+                    </div>
+                    <div class="content">
+                        <h2>Bonjour {user.username},</h2>
+                        <p><strong>Stéphane, Responsable Technique du Phare, vous invite à utiliser l'application LE PHARE CHECK.</strong></p>
+                        
+                        <div class="credentials">
+                            <p><strong>Nom d'utilisateur :</strong> {user.username}</p>
+                            <p><strong>Mot de passe temporaire :</strong><br>
+                                <span class="password">{password}</span>
+                            </p>
+                        </div>
+                        
+                        <center>
+                            <a href="https://le-phare-check.onrender.com/login" class="button">Se connecter à l’application</a>
+                        </center>
+                        
+                        <div class="warning">
+                            <strong>⚠️ Important :</strong> Pour des raisons de sécurité, vous devez <strong>changer votre mot de passe dès la première connexion</strong>.
+                        </div>
+                    </div>
+                    <div class="footer">
+                        <p>Cet email a été envoyé automatiquement par Le Phare Check.</p>
+                        <p>© 2025 Collection Rivage — Tous droits réservés</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """
+        })
+        print(f"✅ Email bienvenue envoyé à {user.email}")
         return True
-    except ApiException as e:
-        print(f"❌ Erreur Brevo : {e}")
+    except Exception as e:
+        print(f"❌ Erreur Resend (bienvenue): {e}")
         return False
 
 def send_assignment_email(incident, technicien):
-    app_url = "https://le-phare-check.onrender.com"
-    
-    subject = f"Incident assigné : {incident.hebergement.emplacement}"
-    
-    html_content = f"""
-    <html>
-    <body style="font-family: Arial, sans-serif;">
-        <h2>Bonjour {technicien.username},</h2>
-        <p>Un incident vous a été assigné :</p>
-        <ul>
-            <li><strong>Lieu :</strong> {incident.hebergement.emplacement}</li>
-            <li><strong>Type :</strong> {incident.type_incident}</li>
-            <li><strong>Description :</strong> {incident.description}</li>
-        </ul>
-        <a href="{app_url}/problemes/{incident.hebergement.id}" style="background:#e74c3c; color:white; padding:10px 20px; text-decoration:none;">Voir l'incident</a>
-    </body>
-    </html>
-    """
-
-    send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
-        sender={"name": "Le Phare Check Alertes", "email": "stephane@lephare-iledere.com"},
-        to=[{"email": technicien.email, "name": technicien.username}],
-        subject=subject,
-        html_content=html_content
-    )
-
     try:
-        api_response = api_instance.send_transac_email(send_smtp_email)
-        print(f"✅ Email incident envoyé à {technicien.email}")
+        resend.Emails.send({
+            "from": "Le Phare Check <contact@lephare-iledere.com>",
+            "to": [technicien.email],
+            "subject": f"🚨 Incident assigné — {incident.hebergement.emplacement}",
+            "html": f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f7fa; margin: 0; padding: 20px; }}
+                    .container {{ max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow: hidden; }}
+                    .header {{ background: linear-gradient(135deg, #e74c3c, #c0392b); color: white; padding: 30px; text-align: center; }}
+                    .content {{ padding: 30px; line-height: 1.6; color: #333; }}
+                    .incident-box {{ background-color: #fdf2f2; border-left: 4px solid #e74c3c; padding: 20px; margin: 20px 0; border-radius: 8px; }}
+                    .button {{ display: inline-block; background-color: #e74c3c; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 15px 0; }}
+                    .footer {{ text-align: center; padding: 20px; color: #7f8c8d; font-size: 12px; border-top: 1px solid #ecf0f1; }}
+                    @media (max-width: 600px) {{
+                        .container {{ margin: 10px; }}
+                        .button {{ width: 100%; text-align: center; }}
+                    }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>🚨 Nouvel incident assigné</h1>
+                    </div>
+                    <div class="content">
+                        <h2>Bonjour {technicien.username},</h2>
+                        <p>Un nouvel incident vous a été assigné et nécessite votre intervention.</p>
+                        
+                        <div class="incident-box">
+                            <p><strong>Hébergement :</strong> {incident.hebergement.emplacement}</p>
+                            <p><strong>Type :</strong> {incident.type_incident}</p>
+                            <p><strong>Description :</strong> {incident.description}</p>
+                        </div>
+                        
+                        <center>
+                            <a href="https://le-phare-check.onrender.com/problemes/{incident.hebergement.id}" class="button">Voir l'incident</a>
+                        </center>
+                    </div>
+                    <div class="footer">
+                        <p>Cet email a été envoyé automatiquement par Le Phare Check.</p>
+                        <p>© 2025 Collection Rivage — Tous droits réservés</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """
+        })
+        print(f"✅ Email assignation envoyé à {technicien.email}")
         return True
-    except ApiException as e:
-        print(f"❌ Erreur Brevo incident : {e}")
+    except Exception as e:
+        print(f"❌ Erreur Resend (assignation): {e}")
         return False
