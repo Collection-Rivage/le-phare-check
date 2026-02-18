@@ -339,45 +339,34 @@ def signaler_incident(hebergement_id):
         flash('Hébergement non trouvé', 'danger')
         return redirect(url_for('hebergements'))
     
-    # Vider le cache pour forcer la relecture depuis PostgreSQL
-    db.session.expire_all()
-    
     # Charger les techniciens frais
-    techs = User.query.filter(
-        User.role.in_(['technicien', 'admin'])
-    ).order_by(User.username).all()
-    
-    # Liste des IDs valides
-    valid_ids = {t.id for t in techs}
+    techs = User.query.filter(User.role.in_(['technicien', 'admin'])).order_by(User.username).all()
+    valid_ids = {str(t.id) for t in techs} # Conversion en string pour comparaison facile avec le form
     
     if request.method == 'POST':
         type_incident = request.form.get('type_incident', '')
         description = request.form.get('description', '')
+        assigne_a_raw = request.form.get('assigne_a', '').strip()
         
-        # Récupération et validation stricte
-        assigne_a_raw = request.form.get('assigne_a', '')
         assigne_a = None
+        technicien_obj = None
         
-        if assigne_a_raw and assigne_a_raw.strip():
+        # --- LOGIQUE D'ASSIGNATION CORRIGÉE ---
+        if assigne_a_raw and assigne_a_raw in valid_ids:
             try:
-                user_id = int(assigne_a_raw.strip())
-                # Vérification dans la liste fraîche
-                if user_id in valid_ids:
-                    # Double vérification avec requête explicite
-                    user_exists = db.session.execute(
-                        select(User.id).where(User.id == user_id)
-                    ).scalar_one_or_none()
-                    
-                    if user_exists:
-                        assigne_a = user_id
-                    else:
-                        flash('Le technicien sélectionné n\'existe pas.', 'warning')
+                user_id = int(assigne_a_raw)
+                technicien_obj = db.session.get(User, user_id)
+                if technicien_obj:
+                    assigne_a = user_id
+                    print(f"🔍 DEBUG: Technicien assigné ID: {assigne_a} ({technicien_obj.username})")
                 else:
-                    flash('Technicien invalide.', 'warning')
+                    print(f"⚠️ DEBUG: ID trouvé dans liste mais utilisateur introuvable en BDD: {user_id}")
             except ValueError:
-                flash('ID invalide.', 'warning')
-        
-        # CRÉATION
+                print(f"⚠️ DEBUG: Erreur conversion ID: {assigne_a_raw}")
+        else:
+            print(f"ℹ️ DEBUG: Aucun technicien valide sélectionné. Reçu: '{assigne_a_raw}', Valides: {valid_ids}")
+
+        # CRÉATION DE L'INCIDENT
         i = Incident(
             hebergement_id=hebergement_id,
             type_incident=type_incident,
@@ -387,54 +376,38 @@ def signaler_incident(hebergement_id):
         )
         db.session.add(i)
         
-        # Mise à jour statut
+        # Mise à jour statut hébergement
         if type_incident == 'urgence':
             heb.statut = 'probleme'
         else:
             heb.statut = 'alerte'
         
-        # COMMIT avec gestion d'erreur
         try:
             db.session.commit()
+            print(f"✅ Incident créé en BDD avec ID: {i.id}")
             
-            # Email si assigné
-            if assigne_a:
-                technicien = db.session.get(User, assigne_a)
-                if technicien:
-                    try:
-                        send_assignment_email(i, technicien)
-                    except Exception as e:
-                        print(f"Erreur email: {e}")
-            
-            if assigne_a:
-                flash('Incident signalé et assigné avec succès !', 'success')
+            # --- ENVOI EMAIL (Même si assigne_a est None, on logue) ---
+            if assigne_a and technicien_obj:
+                try:
+                    print(f"📧 TENTATIVE ENVOI EMAIL à {technicien_obj.email}...")
+                    success = send_assignment_email(i, technicien_obj)
+                    if success:
+                        flash('Incident signalé et email envoyé au technicien !', 'success')
+                    else:
+                        flash('Incident créé, mais échec envoi email (voir logs).', 'warning')
+                except Exception as e:
+                    print(f"❌ ERREUR FATALE ENVOI EMAIL: {e}")
+                    flash('Incident créé, erreur technique envoi email.', 'warning')
             else:
+                print("⚠️ PAS D'ENVOI EMAIL : Aucun technicien assigné (assigne_a is None)")
                 flash('Incident signalé (sans technicien assigné).', 'warning')
                 
             return redirect(url_for('hebergements'))
             
-        except (IntegrityError, DBAPIError) as e:
+        except Exception as e:
             db.session.rollback()
-            
-            # Recréation sans assignation
-            i2 = Incident(
-                hebergement_id=hebergement_id,
-                type_incident=type_incident,
-                description=description,
-                assigne_a=None,
-                cree_par=current_user.id
-            )
-            db.session.add(i2)
-            
-            heb2 = db.session.get(Hebergement, hebergement_id)
-            if type_incident == 'urgence':
-                heb2.statut = 'probleme'
-            else:
-                heb2.statut = 'alerte'
-            
-            db.session.commit()
-            
-            flash('Incident créé mais SANS technicien assigné (ID invalide en base).', 'warning')
+            print(f"❌ ERREUR BDD: {e}")
+            flash('Erreur lors de la création de l\'incident.', 'danger')
             return redirect(url_for('hebergements'))
     
     return render_template('incident.html', hebergement=heb, techniciens=techs)
