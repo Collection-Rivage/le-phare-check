@@ -341,7 +341,8 @@ def signaler_incident(hebergement_id):
     
     # Charger les techniciens frais
     techs = User.query.filter(User.role.in_(['technicien', 'admin'])).order_by(User.username).all()
-    valid_ids = {str(t.id) for t in techs} # Conversion en string pour comparaison facile avec le form
+    # On crée un dictionnaire pour accès rapide : {id: user_object}
+    valid_users_map = {t.id: t for t in techs} 
     
     if request.method == 'POST':
         type_incident = request.form.get('type_incident', '')
@@ -351,20 +352,36 @@ def signaler_incident(hebergement_id):
         assigne_a = None
         technicien_obj = None
         
-        # --- LOGIQUE D'ASSIGNATION CORRIGÉE ---
-        if assigne_a_raw and assigne_a_raw in valid_ids:
+        # --- LOGIQUE D'ASSIGNATION SÉCURISÉE ---
+        if assigne_a_raw:
             try:
                 user_id = int(assigne_a_raw)
-                technicien_obj = db.session.get(User, user_id)
-                if technicien_obj:
+                
+                # 1. Vérification locale (dans la liste chargée au début de la requête)
+                if user_id in valid_users_map:
+                    technicien_obj = valid_users_map[user_id]
                     assigne_a = user_id
-                    print(f"🔍 DEBUG: Technicien assigné ID: {assigne_a} ({technicien_obj.username})")
+                    print(f"🔍 DEBUG: Technicien trouvé en mémoire: ID {user_id} ({technicien_obj.username})")
                 else:
-                    print(f"⚠️ DEBUG: ID trouvé dans liste mais utilisateur introuvable en BDD: {user_id}")
+                    # 2. Si pas trouvé en mémoire, on essaie de recharger directement depuis la BDD (Double check)
+                    print(f"⚠️ DEBUG: Pas en mémoire, tentative recharge BDD pour ID {user_id}...")
+                    technicien_obj = db.session.get(User, user_id)
+                    
+                    if technicien_obj and technicien_obj.role in ['technicien', 'admin']:
+                        assigne_a = user_id
+                        print(f"✅ DEBUG: Technicien récupéré directement depuis BDD: ID {user_id}")
+                    else:
+                        print(f"❌ DEBUG: ÉCHEC TOTAL. L'ID {user_id} n'existe PAS dans la table users ou n'a pas le bon rôle.")
+                        flash(f'Erreur: Le technicien sélectionné (ID {user_id}) est introuvable en base de données.', 'danger')
+                        # On recharge la page pour afficher l'erreur sans planter
+                        return render_template('incident.html', hebergement=heb, techniciens=techs)
+
             except ValueError:
                 print(f"⚠️ DEBUG: Erreur conversion ID: {assigne_a_raw}")
+                flash('ID technicien invalide.', 'danger')
+                return render_template('incident.html', hebergement=heb, techniciens=techs)
         else:
-            print(f"ℹ️ DEBUG: Aucun technicien valide sélectionné. Reçu: '{assigne_a_raw}', Valides: {valid_ids}")
+            print("ℹ️ DEBUG: Aucun technicien sélectionné dans le formulaire.")
 
         # CRÉATION DE L'INCIDENT
         i = Incident(
@@ -386,7 +403,7 @@ def signaler_incident(hebergement_id):
             db.session.commit()
             print(f"✅ Incident créé en BDD avec ID: {i.id}")
             
-            # --- ENVOI EMAIL (Même si assigne_a est None, on logue) ---
+            # --- ENVOI EMAIL ---
             if assigne_a and technicien_obj:
                 try:
                     print(f"📧 TENTATIVE ENVOI EMAIL à {technicien_obj.email}...")
@@ -399,7 +416,7 @@ def signaler_incident(hebergement_id):
                     print(f"❌ ERREUR FATALE ENVOI EMAIL: {e}")
                     flash('Incident créé, erreur technique envoi email.', 'warning')
             else:
-                print("⚠️ PAS D'ENVOI EMAIL : Aucun technicien assigné (assigne_a is None)")
+                print("⚠️ PAS D'ENVOI EMAIL : assigne_a est None ou technicien_obj manquant")
                 flash('Incident signalé (sans technicien assigné).', 'warning')
                 
             return redirect(url_for('hebergements'))
@@ -407,7 +424,7 @@ def signaler_incident(hebergement_id):
         except Exception as e:
             db.session.rollback()
             print(f"❌ ERREUR BDD: {e}")
-            flash('Erreur lors de la création de l\'incident.', 'danger')
+            flash(f'Erreur base de données: {str(e)}', 'danger')
             return redirect(url_for('hebergements'))
     
     return render_template('incident.html', hebergement=heb, techniciens=techs)
