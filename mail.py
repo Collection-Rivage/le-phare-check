@@ -110,94 +110,204 @@ def send_assignment_email(incident, technicien):
     
     app_url = "https://le-phare-check.onrender.com"
     
-    # Détection du niveau d'urgence pour adapter les couleurs
-    is_urgent = incident.type_incident == 'urgence'
-    title_text = "URGENCE CRITIQUE" if is_urgent else "NOUVEL INCIDENT"
-    header_gradient = "linear-gradient(135deg, #dc3545 0%, #a71d2a 100%)" if is_urgent else "linear-gradient(135deg, #fd7e14 0%, #d35400 100%)"
-    btn_color = "#dc3545" if is_urgent else "#fd7e14"
+    # Détection du niveau d'urgence pour adapter les couleurs et le texte
+    is_urgent = incident.type_incident.lower() == 'urgence'
     
-    subject = f"🚨 {title_text} : {incident.hebergement.emplacement}"
+    if is_urgent:
+        title_text = "URGENCE CRITIQUE"
+        header_color = "#dc2626" # Rouge vif
+        header_gradient = "linear-gradient(135deg, #dc2626 0%, #991b1b 100%)"
+        btn_color = "#dc2626"
+        icon = "🚨"
+        border_color = "#fecaca"
+        bg_card = "#fef2f2"
+    else:
+        title_text = "NOUVEL INCIDENT"
+        header_color = "#ea580c" # Orange
+        header_gradient = "linear-gradient(135deg, #ea580c 0%, #9a3412 100%)"
+        btn_color = "#ea580c"
+        icon = "⚠️"
+        border_color = "#ffedd5"
+        bg_card = "#fff7ed"
+
+    subject = f"{icon} {title_text} : {incident.hebergement.emplacement}"
     
-    # Formatage date
+    # Formatage de la date
     date_str = "À l'instant"
     if hasattr(incident, 'created_at') and incident.created_at:
         date_str = incident.created_at.strftime('%d/%m/%Y à %H:%M')
 
-    # DESIGN MODERNE INCIDENT
     html_content = f"""
     <!DOCTYPE html>
-    <html lang="fr">
+    <html lang="fr" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
     <head>
-        <meta charset="UTF-8">
+        <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Incident Assigné</title>
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title>{title_text}</title>
         <style>
-            body {{ font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; margin: 0; padding: 0; }}
-            .container {{ max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }}
-            .header {{ background: {header_gradient}; padding: 40px 20px; text-align: center; color: white; }}
-            .header h1 {{ margin: 0; font-size: 26px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }}
-            .header-icon {{ font-size: 40px; margin-bottom: 10px; display: block; }}
-            .content {{ padding: 40px 30px; color: #333; }}
-            .greeting {{ font-size: 18px; font-weight: 600; color: #2c3e50; margin-bottom: 15px; }}
-            .intro {{ font-size: 16px; color: #555; margin-bottom: 25px; }}
-            .incident-card {{ background-color: #fff5f5; border: 1px solid #ffcccc; border-radius: 8px; padding: 25px; margin: 25px 0; }}
-            .card-title {{ color: #dc3545; font-weight: bold; font-size: 14px; text-transform: uppercase; margin-bottom: 15px; display: block; border-bottom: 2px solid #ffcccc; padding-bottom: 10px; }}
-            .detail-item {{ margin: 12px 0; display: flex; align-items: flex-start; }}
-            .detail-icon {{ width: 25px; margin-right: 10px; text-align: center; font-size: 18px; }}
-            .detail-text {{ font-size: 15px; color: #444; }}
-            .detail-text strong {{ color: #2c3e50; }}
-            .btn-container {{ text-align: center; margin: 35px 0; }}
-            .btn {{ display: inline-block; background-color: {btn_color}; color: white; padding: 16px 40px; border-radius: 50px; text-decoration: none; font-weight: bold; font-size: 16px; box-shadow: 0 4px 15px rgba(220,53,69,0.3); transition: transform 0.2s; }}
-            .btn:hover {{ transform: translateY(-2px); filter: brightness(110%); }}
-            .footer {{ background-color: #f8f9fa; padding: 25px; text-align: center; font-size: 12px; color: #adb5bd; border-top: 1px solid #e9ecef; }}
+            /* Reset styles */
+            body, table, td, a {{ -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }}
+            table, td {{ mso-table-lspace: 0pt; mso-table-rspace: 0pt; }}
+            img {{ -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }}
+            table {{ border-collapse: collapse !important; }}
+            body {{ height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; }}
+            
+            /* Mobile styles */
+            @media screen and (max-width: 600px) {{
+                .email-container {{ width: 100% !important; }}
+                .fluid-img {{ width: 100% !important; max-width: 100% !important; height: auto !important; }}
+                .stack-column {{ display: block !important; width: 100% !important; max-width: 100% !important; direction: ltr !important; }}
+                .center-on-mobile {{ text-align: center !important; }}
+                .padding-mobile {{ padding: 20px !important; }}
+            }}
         </style>
     </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <span class="header-icon">🚨</span>
-                <h1>{title_text}</h1>
-            </div>
-            <div class="content">
-                <div class="greeting">Bonjour {technicien.username},</div>
-                <div class="intro">Un nouvel incident a été signalé et vous a été assigné. Votre intervention est requise :</div>
-                
-                <div class="incident-card">
-                    <span class="card-title">Détails de l'intervention</span>
-                    
-                    <div class="detail-item">
-                        <span class="detail-icon">📍</span>
-                        <div class="detail-text"><strong>Lieu :</strong><br>{incident.hebergement.emplacement}</div>
-                    </div>
-                    
-                    <div class="detail-item">
-                        <span class="detail-icon">⚠️</span>
-                        <div class="detail-text"><strong>Type :</strong> {incident.type_incident.capitalize()}</div>
-                    </div>
-                    
-                    <div class="detail-item">
-                        <span class="detail-icon">📝</span>
-                        <div class="detail-text"><strong>Description :</strong><br>{incident.description}</div>
-                    </div>
-                    
-                    <div class="detail-item">
-                        <span class="detail-icon">🕒</span>
-                        <div class="detail-text"><strong>Signalé le :</strong> {date_str}</div>
-                    </div>
-                </div>
-                
-                <div class="btn-container">
-                    <a href="{app_url}/problemes/{incident.hebergement.id}" class="btn">Voir l'incident & Agir</a>
-                </div>
-                
-                <p style="text-align: center; font-size: 13px; color: #6c757d; margin-top: 20px;">
-                    Si vous ne pouvez pas traiter cet incident, merci de prévenir Stéphane immédiatement.
-                </p>
-            </div>
-            <div class="footer">
-                <p>Le Phare Check - Collection Rivage<br>Service Technique</p>
-            </div>
+    <body style="margin: 0; padding: 0; background-color: #f3f4f6;">
+        
+        <!-- Hidden preheader -->
+        <div style="display: none; font-size: 1px; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;">
+            Un nouvel incident vous a été assigné : {incident.hebergement.emplacement}. Intervention requise.
         </div>
+
+        <center style="width: 100%; background-color: #f3f4f6;">
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f3f4f6;">
+                <tr>
+                    <td align="center" valign="top" style="padding: 40px 10px;">
+                        
+                        <!-- Main Container -->
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" class="email-container" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+                            
+                            <!-- Header Banner -->
+                            <tr>
+                                <td style="background: {header_gradient}; padding: 40px 30px; text-align: center;">
+                                    <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                                        {icon} {title_text}
+                                    </h1>
+                                    <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.9); font-size: 16px; font-weight: 500;">
+                                        Intervention requise immédiatement
+                                    </p>
+                                </td>
+                            </tr>
+                            
+                            <!-- Content Body -->
+                            <tr>
+                                <td class="padding-mobile" style="padding: 40px 30px;">
+                                    
+                                    <!-- Greeting -->
+                                    <p style="margin: 0 0 20px 0; font-size: 18px; color: #1f2937; font-weight: 600;">
+                                        Bonjour {technicien.username},
+                                    </p>
+                                    <p style="margin: 0 0 30px 0; font-size: 16px; color: #4b5563; line-height: 1.6;">
+                                        Un nouvel incident a été signalé sur le site et vous a été assigné. Veuillez prendre connaissance des détails ci-dessous :
+                                    </p>
+                                    
+                                    <!-- Incident Details Card -->
+                                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: {bg_card}; border-left: 5px solid {header_color}; border-radius: 8px; margin-bottom: 30px;">
+                                        <tr>
+                                            <td style="padding: 25px;">
+                                                <h3 style="margin: 0 0 20px 0; color: {header_color}; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;">
+                                                    📋 Détails de l'intervention
+                                                </h3>
+                                                
+                                                <!-- Location -->
+                                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 15px;">
+                                                    <tr>
+                                                        <td width="30" valign="top" style="font-size: 18px; padding-right: 10px;">📍</td>
+                                                        <td valign="top">
+                                                            <span style="display: block; font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: 600;">Lieu</span>
+                                                            <span style="font-size: 16px; color: #111827; font-weight: 700;">{incident.hebergement.emplacement}</span>
+                                                        </td>
+                                                    </tr>
+                                                </table>
+                                                
+                                                <!-- Type -->
+                                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 15px;">
+                                                    <tr>
+                                                        <td width="30" valign="top" style="font-size: 18px; padding-right: 10px;">⚠️</td>
+                                                        <td valign="top">
+                                                            <span style="display: block; font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: 600;">Type</span>
+                                                            <span style="font-size: 16px; color: #111827; font-weight: 600;">{incident.type_incident.capitalize()}</span>
+                                                        </td>
+                                                    </tr>
+                                                </table>
+                                                
+                                                <!-- Description -->
+                                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 15px;">
+                                                    <tr>
+                                                        <td width="30" valign="top" style="font-size: 18px; padding-right: 10px;">📝</td>
+                                                        <td valign="top">
+                                                            <span style="display: block; font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: 600;">Description</span>
+                                                            <span style="font-size: 15px; color: #374151; line-height: 1.5;">{incident.description}</span>
+                                                        </td>
+                                                    </tr>
+                                                </table>
+                                                
+                                                <!-- Date -->
+                                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                                    <tr>
+                                                        <td width="30" valign="top" style="font-size: 18px; padding-right: 10px;">🕒</td>
+                                                        <td valign="top">
+                                                            <span style="display: block; font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: 600;">Signalé le</span>
+                                                            <span style="font-size: 14px; color: #6b7280;">{date_str}</span>
+                                                        </td>
+                                                    </tr>
+                                                </table>
+                                                
+                                            </td>
+                                        </tr>
+                                    </table>
+                                    
+                                    <!-- Call to Action Button -->
+                                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                        <tr>
+                                            <td align="center" style="padding-bottom: 20px;">
+                                                <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                                                    <tr>
+                                                        <td style="border-radius: 50px; background-color: {btn_color}; text-align: center;">
+                                                            <a href="{app_url}/problemes/{incident.hebergement.id}" target="_blank" style="display: inline-block; padding: 16px 40px; font-size: 16px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 50px; border: 1px solid {btn_color}; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                                                Voir l'incident & Agir ➔
+                                                            </a>
+                                                        </td>
+                                                    </tr>
+                                                </table>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                    
+                                    <p style="margin: 0; font-size: 13px; color: #9ca3af; text-align: center; font-style: italic;">
+                                        Si vous ne pouvez pas traiter cet incident, merci de prévenir Stéphane Responsable Technique immédiatement.
+                                    </p>
+                                    
+                                </td>
+                            </tr>
+                            
+                            <!-- Footer -->
+                            <tr>
+                                <td style="background-color: #f9fafb; padding: 25px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+                                    <p style="margin: 0 0 5px 0; font-size: 12px; color: #6b7280; font-weight: 600; text-transform: uppercase;">
+                                        Le Phare Check — Collection Rivage
+                                    </p>
+                                    <p style="margin: 0; font-size: 11px; color: #9ca3af;">
+                                        Service Technique & Maintenance
+                                    </p>
+                                </td>
+                            </tr>
+                            
+                        </table>
+                        <!-- End Main Container -->
+                        
+                        <!-- Spacer -->
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                            <tr>
+                                <td height="40" style="font-size: 40px; line-height: 40px;">&nbsp;</td>
+                            </tr>
+                        </table>
+                        
+                    </td>
+                </tr>
+            </table>
+        </center>
     </body>
     </html>
     """
