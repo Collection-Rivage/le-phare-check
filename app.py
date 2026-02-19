@@ -221,9 +221,24 @@ def hebergements():
     if type_id is not None:
         query = query.filter(Hebergement.type_id == type_id)
     
+    C'est noté ! Tu veux une **liste unique et continue**, triée uniquement par le **numéro d'emplacement** (1, 2, 3...), peu importe le type. Le type ne doit servir qu'à l'affichage, pas au rangement.
+
+Le problème vient probablement du fait que ton tri actuel utilise encore `TypeHebergement.nom` ou `type_id` en première priorité. Quand tu changes le type, la valeur de tri change, et l'élément "saute" à un autre endroit de la liste globale.
+
+Pour avoir un ordre **strictement numérique par emplacement** (ignorer le type dans le tri), voici la correction exacte pour `app.py` :
+
+### 🛠️ Modifier le tri dans `app.py` (Route `/hebergements`)
+
+Ouvre `app.py`, va dans la fonction `@app.route('/hebergements')`, et remplace **toute** la partie `.order_by(...)` par ceci :
+
+```python
+    # ... (le reste de la requête 'query' reste identique) ...
+
+    # NOUVEAU TRI : UNIQUEMENT PAR EMPLACEMENT (Ignorer le Type)
+    # 1. func.length() assure que "2" vient avant "10" (tri numérique naturel)
+    # 2. Hebergement.emplacement assure l'ordre alphabétique/numérique fin
     query = query.order_by(
-        Hebergement.type_id.asc(),
-        func.length(Hebergement.emplacement).asc(),
+        func.length(Hebergement.emplacement).asc(), 
         Hebergement.emplacement.asc()
     )
     
@@ -237,6 +252,20 @@ def hebergements():
         statut=statut,
         type_id=type_id_str
     )
+```
+
+### Pourquoi ça règle le problème ?
+*   **Avant :** Le tri dépendait peut-être du type. Changer le type = changer la clé de tri = l'objet bouge loin.
+*   **Maintenant :** Le tri dépend **uniquement** de la colonne `emplacement`.
+    *   Que l'hébergement soit une "Cabane" ou un "Mobil-home", s'il s'appelle "12", il sera toujours entre "11" et "13".
+    *   Changer son type ne modifie pas son nom d'emplacement, donc **il ne bougera pas de place dans la liste** (sauf si tu changes aussi son numéro d'emplacement).
+
+### ✅ Action :
+1.  Modifie `app.py` avec ce code.
+2.  Commit & Push.
+3.  Va sur ta liste d'hébergements.
+4.  Change le type d'un hébergement (ex: passe la "Cabane 5" en "Mobil-home 5").
+5.  **Résultat :** Il restera exactement à sa place (entre 4 et 6), seul le badge/icône de type changera visuellement. C'est ça que tu voulais ? 🎯
 
 @app.route('/hebergements/add', methods=['POST'])
 @login_required
