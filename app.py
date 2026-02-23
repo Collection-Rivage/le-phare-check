@@ -138,14 +138,43 @@ def hebergements():
     q = request.args.get('q', '').strip()
     statut = request.args.get('statut', '')
     type_id_str = request.args.get('type_id', '')
-    query = db.session.query(Hebergement).options(selectinload(Hebergement.type_hebergement))
-    if q: query = query.filter(or_(Hebergement.emplacement.ilike(f'%{q}%'), Hebergement.numero_chassis.ilike(f'%{q}%')))
-    if statut: query = query.filter(Hebergement.statut == statut)
-    if type_id_str: query = query.filter(Hebergement.type_id == int(type_id_str))
     
-    # Tri par emplacement (1, 2, 10...)
+    # 1. Sous-requête pour compter les checks et avoir la date du dernier
+    c_stats = db.session.query(
+        Check.hebergement_id.label("hid"), 
+        func.count(Check.id).label("cnt"), 
+        func.max(Check.created_at).label("last")
+    ).group_by(Check.hebergement_id).subquery()
+    
+    # 2. Sous-requête pour compter les incidents ouverts
+    i_stats = db.session.query(
+        Incident.hebergement_id.label("hid"), 
+        func.count(Incident.id).label("cnt")
+    ).filter(Incident.statut == 'ouvert').group_by(Incident.hebergement_id).subquery()
+    
+    # 3. Requête principale qui joint tout
+    query = db.session.query(
+        Hebergement, 
+        func.coalesce(c_stats.c.cnt, 0), 
+        c_stats.c.last, 
+        func.coalesce(i_stats.c.cnt, 0)
+    ).outerjoin(c_stats, c_stats.c.hid == Hebergement.id
+    ).outerjoin(i_stats, i_stats.c.hid == Hebergement.id
+    ).options(selectinload(Hebergement.type_hebergement))
+    
+    # Filtres
+    if q:
+        query = query.filter(or_(Hebergement.emplacement.ilike(f'%{q}%'), Hebergement.numero_chassis.ilike(f'%{q}%')))
+    if statut:
+        query = query.filter(Hebergement.statut == statut)
+    if type_id_str:
+        query = query.filter(Hebergement.type_id == int(type_id_str))
+    
+    # Tri par emplacement numérique
     query = query.order_by(func.length(Hebergement.emplacement).asc(), Hebergement.emplacement.asc())
+    
     h_list = query.paginate(page=page, per_page=30, error_out=False)
+    
     return render_template('hebergements.html', hebergements=h_list, types=get_types(), q=q, statut=statut, type_id=type_id_str)
 
 @app.route('/check/<int:hebergement_id>', methods=['GET', 'POST'])
