@@ -80,7 +80,7 @@ def recalculer_statut_hebergement(hebergement_id):
     else: heb.statut = 'ok'
     db.session.commit()
 
-# ===================== ROUTES =====================
+# ===================== ROUTES CONNEXION =====================
 
 @app.route('/')
 @login_required
@@ -122,6 +122,8 @@ def change_password():
             return redirect(url_for('dashboard'))
     return render_template('change_password.html')
 
+# ===================== DASHBOARD & HISTORIQUE =====================
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -131,6 +133,14 @@ def dashboard():
     derniers_checks = Check.query.options(joinedload(Check.hebergement), joinedload(Check.technicien)).order_by(desc(Check.created_at)).limit(10).all()
     return render_template('dashboard.html', total=total, ok=ok, alerte=stats.get('alerte', 0), probleme=stats.get('probleme', 0), taux_ok=round((ok/total)*100, 1) if total else 0, derniers_checks=derniers_checks)
 
+@app.route('/historique')
+@login_required
+def historique():
+    checks = Check.query.options(joinedload(Check.hebergement), joinedload(Check.technicien)).order_by(desc(Check.created_at)).limit(50).all()
+    return render_template('historique.html', checks=checks)
+
+# ===================== HEBERGEMENTS =====================
+
 @app.route('/hebergements')
 @login_required
 def hebergements():
@@ -139,63 +149,68 @@ def hebergements():
     statut = request.args.get('statut', '')
     type_id_str = request.args.get('type_id', '')
     
-    # 1. Sous-requête pour compter les checks et avoir la date du dernier
-    c_stats = db.session.query(
-        Check.hebergement_id.label("hid"), 
-        func.count(Check.id).label("cnt"), 
-        func.max(Check.created_at).label("last")
-    ).group_by(Check.hebergement_id).subquery()
+    c_stats = db.session.query(Check.hebergement_id.label("hid"), func.count(Check.id).label("cnt"), func.max(Check.created_at).label("last")).group_by(Check.hebergement_id).subquery()
+    i_stats = db.session.query(Incident.hebergement_id.label("hid"), func.count(Incident.id).label("cnt")).filter(Incident.statut == 'ouvert').group_by(Incident.hebergement_id).subquery()
     
-    # 2. Sous-requête pour compter les incidents ouverts
-    i_stats = db.session.query(
-        Incident.hebergement_id.label("hid"), 
-        func.count(Incident.id).label("cnt")
-    ).filter(Incident.statut == 'ouvert').group_by(Incident.hebergement_id).subquery()
+    query = db.session.query(Hebergement, func.coalesce(c_stats.c.cnt, 0), c_stats.c.last, func.coalesce(i_stats.c.cnt, 0)).outerjoin(c_stats, c_stats.c.hid == Hebergement.id).outerjoin(i_stats, i_stats.c.hid == Hebergement.id).options(selectinload(Hebergement.type_hebergement))
     
-    # 3. Requête principale qui joint tout
-    query = db.session.query(
-        Hebergement, 
-        func.coalesce(c_stats.c.cnt, 0), 
-        c_stats.c.last, 
-        func.coalesce(i_stats.c.cnt, 0)
-    ).outerjoin(c_stats, c_stats.c.hid == Hebergement.id
-    ).outerjoin(i_stats, i_stats.c.hid == Hebergement.id
-    ).options(selectinload(Hebergement.type_hebergement))
+    if q: query = query.filter(or_(Hebergement.emplacement.ilike(f'%{q}%'), Hebergement.numero_chassis.ilike(f'%{q}%')))
+    if statut: query = query.filter(Hebergement.statut == statut)
+    if type_id_str: query = query.filter(Hebergement.type_id == int(type_id_str))
     
-    # Filtres
-    if q:
-        query = query.filter(or_(Hebergement.emplacement.ilike(f'%{q}%'), Hebergement.numero_chassis.ilike(f'%{q}%')))
-    if statut:
-        query = query.filter(Hebergement.statut == statut)
-    if type_id_str:
-        query = query.filter(Hebergement.type_id == int(type_id_str))
-    
-    # Tri par emplacement numérique
     query = query.order_by(func.length(Hebergement.emplacement).asc(), Hebergement.emplacement.asc())
-    
     h_list = query.paginate(page=page, per_page=30, error_out=False)
-    
     return render_template('hebergements.html', hebergements=h_list, types=get_types(), q=q, statut=statut, type_id=type_id_str)
+
+@app.route('/hebergements/add', methods=['POST'])
+@login_required
+def add_hebergement():
+    if current_user.role != 'admin': return redirect(url_for('hebergements'))
+    h = Hebergement(emplacement=request.form.get('emplacement'), type_id=request.form.get('type_id'), numero_chassis=request.form.get('numero_chassis'), nb_personnes=request.form.get('nb_personnes'), compteur_eau=request.form.get('compteur_eau'))
+    db.session.add(h)
+    db.session.commit()
+    flash('Ajouté', 'success')
+    return redirect(url_for('hebergements'))
+
+@app.route('/hebergements/edit/<int:id>', methods=['POST'])
+@login_required
+def edit_hebergement(id):
+    if current_user.role != 'admin': return redirect(url_for('hebergements'))
+    h = db.session.get(Hebergement, id)
+    if not h: return redirect(url_for('hebergements'))
+    h.emplacement = request.form.get('emplacement')
+    h.type_id = request.form.get('type_id')
+    h.numero_chassis = request.form.get('numero_chassis')
+    h.nb_personnes = request.form.get('nb_personnes')
+    h.compteur_eau = request.form.get('compteur_eau')
+    db.session.commit()
+    flash('Modifié', 'success')
+    return redirect(url_for('hebergements'))
+
+@app.route('/hebergements/delete/<int:id>')
+@login_required
+def delete_hebergement(id):
+    if current_user.role != 'admin': return redirect(url_for('hebergements'))
+    h = db.session.get(Hebergement, id)
+    if h:
+        db.session.delete(h)
+        db.session.commit()
+        flash('Supprimé', 'warning')
+    return redirect(url_for('hebergements'))
+
+# ===================== CHECKS & INCIDENTS =====================
 
 @app.route('/check/<int:hebergement_id>', methods=['GET', 'POST'])
 @login_required
 def check(hebergement_id):
     heb = db.session.get(Hebergement, hebergement_id)
-    if not heb:
-        flash('Hébergement introuvable', 'danger')
-        return redirect(url_for('hebergements'))
+    if not heb: return redirect(url_for('hebergements'))
     if request.method == 'POST':
-        c = Check(
-            hebergement_id=hebergement_id,
-            user_id=current_user.id,
-            electricite=request.form.get('electricite') == 'on',
-            plomberie=request.form.get('plomberie') == 'on',
-            chauffage=request.form.get('chauffage') == 'on',
-            proprete=request.form.get('proprete') == 'on',
-            equipements=request.form.get('equipements') == 'on',
-            observations=request.form.get('observations'),
-            probleme_critique=request.form.get('probleme_critique') == 'on'
-        )
+        c = Check(hebergement_id=hebergement_id, user_id=current_user.id, 
+                  electricite=request.form.get('electricite') == 'on', plomberie=request.form.get('plomberie') == 'on',
+                  chauffage=request.form.get('chauffage') == 'on', proprete=request.form.get('proprete') == 'on',
+                  equipements=request.form.get('equipements') == 'on', observations=request.form.get('observations'),
+                  probleme_critique=request.form.get('probleme_critique') == 'on')
         db.session.add(c)
         heb.statut = 'probleme' if c.probleme_critique else ('ok' if all([c.electricite, c.plomberie, c.chauffage, c.proprete, c.equipements]) else 'alerte')
         db.session.commit()
@@ -207,70 +222,42 @@ def check(hebergement_id):
 @login_required
 def signaler_incident(hebergement_id):
     heb = db.session.get(Hebergement, hebergement_id)
-    if not heb:
-        flash('Hébergement non trouvé', 'danger')
-        return redirect(url_for('hebergements'))
-    
+    if not heb: return redirect(url_for('hebergements'))
     techs = User.query.filter(User.role.in_(['technicien', 'admin'])).order_by(User.username).all()
-    
     if request.method == 'POST':
-        type_incident = request.form.get('type_incident', '')
-        description = request.form.get('description', '')
-        assigne_a_raw = request.form.get('assigne_a', '').strip()
-        
-        # --- UPLOAD CLOUDINARY ---
         image_file = request.files.get('image')
         url_photo = None
         if image_file and image_file.filename != '':
             try:
                 upload_result = cloudinary.uploader.upload(image_file)
                 url_photo = upload_result['secure_url']
-            except Exception as e:
-                print(f"❌ Erreur Cloudinary : {e}")
-
-        assigne_a = None
-        technicien_obj = None
-        if assigne_a_raw:
-            try:
-                user_id = int(assigne_a_raw)
-                technicien_obj = db.session.get(User, user_id)
-                if technicien_obj: assigne_a = user_id
-            except ValueError: pass
-
-        i = Incident(
-            hebergement_id=hebergement_id,
-            type_incident=type_incident,
-            description=description,
-            assigne_a=assigne_a,
-            cree_par=current_user.id,
-            image_url=url_photo
-        )
-        db.session.add(i)
-        heb.statut = 'probleme' if type_incident == 'urgence' else 'alerte'
+            except Exception as e: print(f"❌ Cloudinary error: {e}")
         
-        try:
-            db.session.commit()
-            if assigne_a and technicien_obj:
-                send_assignment_email(i, technicien_obj)
-            flash('Incident signalé !', 'success')
-            return redirect(url_for('hebergements'))
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Erreur: {str(e)}', 'danger')
-    
+        assigne_a = request.form.get('assigne_a')
+        tech_obj = db.session.get(User, int(assigne_a)) if assigne_a else None
+        
+        i = Incident(hebergement_id=hebergement_id, type_incident=request.form.get('type_incident'), 
+                     description=request.form.get('description'), assigne_a=tech_obj.id if tech_obj else None,
+                     cree_par=current_user.id, image_url=url_photo)
+        db.session.add(i)
+        heb.statut = 'probleme' if i.type_incident == 'urgence' else 'alerte'
+        db.session.commit()
+        if tech_obj: send_assignment_email(i, tech_obj)
+        flash('Incident signalé !', 'success')
+        return redirect(url_for('hebergements'))
     return render_template('incident.html', hebergement=heb, techniciens=techs)
 
 @app.route('/incident/<int:incident_id>/resoudre', methods=['POST'])
 @login_required
 def resoudre_incident(incident_id):
-    incident = db.session.get(Incident, incident_id)
-    if not incident: return redirect(url_for('hebergements'))
-    incident.statut = 'resolu'
-    incident.date_resolution = datetime.utcnow()
-    incident.resolu_par_id = current_user.id
-    db.session.commit()
-    recalculer_statut_hebergement(incident.hebergement_id)
-    flash('Incident résolu !', 'success')
+    i = db.session.get(Incident, incident_id)
+    if i:
+        i.statut = 'resolu'
+        i.date_resolution = datetime.utcnow()
+        i.resolu_par_id = current_user.id
+        db.session.commit()
+        recalculer_statut_hebergement(i.hebergement_id)
+        flash('Incident résolu !', 'success')
     return redirect(url_for('hebergements'))
 
 @app.route('/problemes/<int:hebergement_id>')
@@ -280,11 +267,7 @@ def voir_problemes(hebergement_id):
     incidents = Incident.query.filter_by(hebergement_id=hebergement_id, statut='ouvert').order_by(desc(Incident.created_at)).all()
     return render_template('problemes.html', hebergement=heb, incidents=incidents)
 
-@app.route('/historique')
-@login_required
-def historique():
-    checks = Check.query.options(joinedload(Check.hebergement), joinedload(Check.technicien)).order_by(desc(Check.created_at)).limit(50).all()
-    return render_template('historique.html', checks=checks)
+# ===================== TYPES & UTILISATEURS =====================
 
 @app.route('/types')
 @login_required
@@ -294,11 +277,11 @@ def types():
 @app.route('/types/add', methods=['POST'])
 @login_required
 def add_type():
-    if current_user.role != 'admin': return redirect(url_for('types'))
-    t = TypeHebergement(nom=request.form.get('nom'), description=request.form.get('description'))
-    db.session.add(t)
-    db.session.commit()
-    flash('Type ajouté', 'success')
+    if current_user.role == 'admin':
+        t = TypeHebergement(nom=request.form.get('nom'), description=request.form.get('description'))
+        db.session.add(t)
+        db.session.commit()
+        flash('Type ajouté', 'success')
     return redirect(url_for('types'))
 
 @app.route('/admin/users')
@@ -312,15 +295,24 @@ def admin_users():
 @login_required
 def add_user():
     if current_user.role != 'admin': return redirect(url_for('dashboard'))
-    username = request.form.get('username')
-    email = request.form.get('email')
-    password_en_clair = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
-    u = User(username=username, email=email, role=request.form.get('role'), must_change_password=True)
-    u.set_password(password_en_clair)
+    u = User(username=request.form.get('username'), email=request.form.get('email'), role=request.form.get('role'))
+    pwd = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+    u.set_password(pwd)
     db.session.add(u)
     db.session.commit()
-    send_welcome_email(u, password_en_clair)
-    flash(f'Utilisateur {username} créé !', 'success')
+    send_welcome_email(u, pwd)
+    flash(f'Utilisateur {u.username} créé !', 'success')
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/users/delete/<int:id>')
+@login_required
+def delete_user(id):
+    if current_user.role != 'admin' or current_user.id == id: return redirect(url_for('admin_users'))
+    u = db.session.get(User, id)
+    if u:
+        db.session.delete(u)
+        db.session.commit()
+        flash('Utilisateur supprimé', 'warning')
     return redirect(url_for('admin_users'))
 
 @app.route('/api/status')
