@@ -225,6 +225,29 @@ def voir_problemes(hebergement_id):
     incidents = Incident.query.filter_by(hebergement_id=hebergement_id, statut='ouvert').order_by(desc(Incident.created_at)).all()
     return render_template('problemes.html', hebergement=heb, incidents=incidents)
 
+@app.route('/historique')
+@login_required
+def historique():
+    checks = Check.query.options(
+        joinedload(Check.hebergement),
+        joinedload(Check.technicien)
+    ).order_by(desc(Check.created_at)).limit(50).all()
+    return render_template('historique.html', checks=checks)
+
+@app.route('/types')
+@login_required
+def types():
+    return render_template('types.html', types=get_types())
+
+@app.route('/types/add', methods=['POST'])
+@login_required
+def add_type():
+    if current_user.role != 'admin': return redirect(url_for('types'))
+    t = TypeHebergement(nom=request.form.get('nom'), description=request.form.get('description'))
+    db.session.add(t)
+    db.session.commit()
+    flash('Type ajouté', 'success')
+    return redirect(url_for('types'))
 @app.route('/admin/users')
 @login_required
 def admin_users():
