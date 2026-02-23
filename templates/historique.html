@@ -27,14 +27,14 @@
                             <td>
                                 {% if check.probleme_critique %}
                                     <span class="badge bg-danger">CRITIQUE</span>
-                                {% elif not all([check.electricite, check.plomberie, check.chauffage, check.proprete, check.equipements]) %}
+                                <!-- MODIFICATION ICI : On utilise "and" au lieu de "all()" -->
+                                {% elif not (check.electricite and check.plomberie and check.chauffage and check.proprete and check.equipements) %}
                                     <span class="badge bg-warning text-dark">ALERTE</span>
                                 {% else %}
                                     <span class="badge bg-success">OK</span>
                                 {% endif %}
                             </td>
                             <td>
-                                <!-- On utilise check.id pour rendre le bouton unique -->
                                 <button class="btn btn-info btn-sm text-white" data-bs-toggle="modal" data-bs-target="#detailsModal{{ check.id }}">
                                     <i class="bi bi-eye"></i> Détails
                                 </button>
