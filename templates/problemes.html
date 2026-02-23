@@ -22,6 +22,19 @@
                 <h5 class="card-title">Description :</h5>
                 <p class="card-text">{{ incident.description }}</p>
                 
+                <!-- NOUVEAU : AFFICHAGE DE LA PHOTO -->
+                {% if incident.image_url %}
+                <div class="mt-3 mb-3">
+                    <p class="fw-bold mb-1">📸 Photo jointe :</p>
+                    <a href="{{ incident.image_url }}" target="_blank">
+                        <img src="{{ incident.image_url }}" class="img-fluid rounded border" 
+                             style="max-height: 250px; cursor: pointer;" 
+                             alt="Photo de l'incident">
+                    </a>
+                    <div class="form-text">Cliquez sur la photo pour l'ouvrir en grand.</div>
+                </div>
+                {% endif %}
+                
                 {% if incident.assigne_a %}
                 <p class="text-muted">
                     <small>Assigné à : {{ incident.technicien.username }}</small>
