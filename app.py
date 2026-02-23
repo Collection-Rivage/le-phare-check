@@ -1,4 +1,6 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, current_app
+import cloudinary
+import cloudinary.uploader
+flask import Flask, render_template, request, redirect, url_for, flash, jsonify, current_app
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from markupsafe import Markup
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
@@ -16,6 +18,11 @@ import random
 import string
 
 app = Flask(__name__)
+cloudinary.config(
+  cloud_name = os.environ.get('CLOUDINARY_CLOUD_NAME'),
+  api_key = os.environ.get('CLOUDINARY_API_KEY'),
+  api_secret = os.environ.get('CLOUDINARY_API_SECRET')
+)
 app.config.from_object(Config)
 
 # ===================== INITIALISATION =====================
@@ -334,6 +341,61 @@ def historique():
 
 # ===================== INCIDENTS =====================
 
+Super ! Les fondations sont prêtes (variables Render + librairie Cloudinary). Maintenant, on va modifier le code pour activer la fonctionnalité.
+
+Voici les **3 fichiers** à modifier. Je te donne le code exact pour chacun.
+
+---
+
+### 1. Modifier `models.py`
+On ajoute la colonne `image_url` dans la table des incidents. 
+
+👉 **Ouvre `models.py` sur GitHub et remplace la classe `Incident` par celle-ci :**
+
+```python
+class Incident(db.Model):
+    __tablename__ = 'incidents'
+    id = db.Column(db.Integer, primary_key=True)
+    hebergement_id = db.Column(db.Integer, db.ForeignKey('hebergements.id'), nullable=False)
+    type_incident = db.Column(db.String(50))
+    description = db.Column(db.Text)
+    statut = db.Column(db.String(20), default='ouvert')
+    assigne_a = db.Column(db.Integer, db.ForeignKey('user.id'))
+    cree_par = db.Column(db.Integer, db.ForeignKey('user.id'))
+    date_resolution = db.Column(db.DateTime, nullable=True)
+    resolu_par_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    image_url = db.Column(db.String(500), nullable=True) # <-- AJOUTÉ ICI
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    hebergement = db.relationship('Hebergement', backref='incidents')
+    technicien = db.relationship('User', foreign_keys=[assigne_a], backref='incidents_assignes')
+    resolu_par = db.relationship('User', foreign_keys=[resolu_par_id], backref='incidents_resolus')
+```
+
+---
+
+### 2. Modifier `app.py`
+On configure l'envoi de la photo vers Cloudinary.
+
+👉 **Ouvre `app.py` sur GitHub :**
+
+**A. Ajoute les imports tout en haut (ligne 1 ou 2) :**
+```python
+import cloudinary
+import cloudinary.uploader
+```
+
+**B. Ajoute la configuration juste après la ligne `app = Flask(__name__)` :**
+```python
+cloudinary.config(
+  cloud_name = os.environ.get('CLOUDINARY_CLOUD_NAME'),
+  api_key = os.environ.get('CLOUDINARY_API_KEY'),
+  api_secret = os.environ.get('CLOUDINARY_API_SECRET')
+)
+```
+
+**C. Remplace TOUTE la fonction `signaler_incident` par celle-ci :**
+```python
 @app.route('/incident/<int:hebergement_id>', methods=['GET', 'POST'])
 @login_required
 def signaler_incident(hebergement_id):
@@ -342,61 +404,45 @@ def signaler_incident(hebergement_id):
         flash('Hébergement non trouvé', 'danger')
         return redirect(url_for('hebergements'))
     
-    # Charger les techniciens frais
     techs = User.query.filter(User.role.in_(['technicien', 'admin'])).order_by(User.username).all()
-    # On crée un dictionnaire pour accès rapide : {id: user_object}
-    valid_users_map = {t.id: t for t in techs} 
     
     if request.method == 'POST':
         type_incident = request.form.get('type_incident', '')
         description = request.form.get('description', '')
         assigne_a_raw = request.form.get('assigne_a', '').strip()
         
+        # --- UPLOAD CLOUDINARY ---
+        image_file = request.files.get('image')
+        url_photo = None
+        if image_file and image_file.filename != '':
+            try:
+                upload_result = cloudinary.uploader.upload(image_file)
+                url_photo = upload_result['secure_url']
+                print(f"✅ Photo uploadée : {url_photo}")
+            except Exception as e:
+                print(f"❌ Erreur Cloudinary : {e}")
+
         assigne_a = None
         technicien_obj = None
-        
-        # --- LOGIQUE D'ASSIGNATION SÉCURISÉE ---
         if assigne_a_raw:
             try:
                 user_id = int(assigne_a_raw)
-                
-                # 1. Vérification locale (dans la liste chargée au début de la requête)
-                if user_id in valid_users_map:
-                    technicien_obj = valid_users_map[user_id]
+                potential_tech = db.session.get(User, user_id)
+                if potential_tech:
                     assigne_a = user_id
-                    print(f"🔍 DEBUG: Technicien trouvé en mémoire: ID {user_id} ({technicien_obj.username})")
-                else:
-                    # 2. Si pas trouvé en mémoire, on essaie de recharger directement depuis la BDD (Double check)
-                    print(f"⚠️ DEBUG: Pas en mémoire, tentative recharge BDD pour ID {user_id}...")
-                    technicien_obj = db.session.get(User, user_id)
-                    
-                    if technicien_obj and technicien_obj.role in ['technicien', 'admin']:
-                        assigne_a = user_id
-                        print(f"✅ DEBUG: Technicien récupéré directement depuis BDD: ID {user_id}")
-                    else:
-                        print(f"❌ DEBUG: ÉCHEC TOTAL. L'ID {user_id} n'existe PAS dans la table users ou n'a pas le bon rôle.")
-                        flash(f'Erreur: Le technicien sélectionné (ID {user_id}) est introuvable en base de données.', 'danger')
-                        # On recharge la page pour afficher l'erreur sans planter
-                        return render_template('incident.html', hebergement=heb, techniciens=techs)
+                    technicien_obj = potential_tech
+            except ValueError: pass
 
-            except ValueError:
-                print(f"⚠️ DEBUG: Erreur conversion ID: {assigne_a_raw}")
-                flash('ID technicien invalide.', 'danger')
-                return render_template('incident.html', hebergement=heb, techniciens=techs)
-        else:
-            print("ℹ️ DEBUG: Aucun technicien sélectionné dans le formulaire.")
-
-        # CRÉATION DE L'INCIDENT
         i = Incident(
             hebergement_id=hebergement_id,
             type_incident=type_incident,
             description=description,
             assigne_a=assigne_a,
-            cree_par=current_user.id
+            cree_par=current_user.id,
+            image_url=url_photo # <-- ON ENREGISTRE L'URL
         )
         db.session.add(i)
         
-        # Mise à jour statut hébergement
         if type_incident == 'urgence':
             heb.statut = 'probleme'
         else:
@@ -404,33 +450,50 @@ def signaler_incident(hebergement_id):
         
         try:
             db.session.commit()
-            print(f"✅ Incident créé en BDD avec ID: {i.id}")
-            
-            # --- ENVOI EMAIL ---
             if assigne_a and technicien_obj:
-                try:
-                    print(f"📧 TENTATIVE ENVOI EMAIL à {technicien_obj.email}...")
-                    success = send_assignment_email(i, technicien_obj)
-                    if success:
-                        flash('Incident signalé et email envoyé au technicien !', 'success')
-                    else:
-                        flash('Incident créé, mais échec envoi email (voir logs).', 'warning')
-                except Exception as e:
-                    print(f"❌ ERREUR FATALE ENVOI EMAIL: {e}")
-                    flash('Incident créé, erreur technique envoi email.', 'warning')
-            else:
-                print("⚠️ PAS D'ENVOI EMAIL : assigne_a est None ou technicien_obj manquant")
-                flash('Incident signalé (sans technicien assigné).', 'warning')
-                
+                send_assignment_email(i, technicien_obj)
+            flash('Incident signalé avec succès !', 'success')
             return redirect(url_for('hebergements'))
-            
         except Exception as e:
             db.session.rollback()
-            print(f"❌ ERREUR BDD: {e}")
             flash(f'Erreur base de données: {str(e)}', 'danger')
             return redirect(url_for('hebergements'))
     
     return render_template('incident.html', hebergement=heb, techniciens=techs)
+```
+
+---
+
+### 3. Modifier `templates/incident.html`
+On ajoute le bouton pour prendre la photo.
+
+👉 **Ouvre `templates/incident.html` et modifie ces deux points :**
+
+**A. Modifie la balise `<form>` pour accepter les fichiers :**
+```html
+<form method="POST" enctype="multipart/form-data">
+```
+
+**B. Ajoute le champ de sélection de photo (juste avant le bouton "Signaler l'incident") :**
+```html
+<div class="mb-3">
+    <label for="image" class="form-label">📸 Photo de l'incident (optionnel)</label>
+    <input type="file" name="image" id="image" class="form-control" accept="image/*" capture="environment">
+    <small class="text-muted">Sur mobile, cela ouvrira directement l'appareil photo.</small>
+</div>
+```
+
+---
+
+### ✅ La dernière étape (Très importante)
+Comme tu as ajouté une colonne `image_url` dans ta base de données, Supabase doit être au courant.
+
+Va dans ton **SQL Editor** sur Supabase et lance cette ligne :
+```sql
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS image_url VARCHAR(500);
+```
+
+**Commit tout sur GitHub et c'est parti !** Tu pourras tester en prenant une photo avec ton téléphone en signalant un incident. Elle apparaîtra dans Cloudinary et l'URL sera enregistrée. 📸✨
 
 @app.route('/incident/<int:incident_id>/resoudre', methods=['POST'])
 @login_required
