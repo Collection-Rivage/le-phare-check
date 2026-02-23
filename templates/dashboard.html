@@ -112,6 +112,7 @@
             <td>
               {% if check.probleme_critique %}
               <span class="badge bg-danger">Problème critique</span>
+              <!-- MODIFICATION ICI : Remplacement de all() par les conditions and -->
               {% elif not (check.electricite and check.plomberie and check.chauffage and check.proprete and check.equipements) %}
               <span class="badge bg-warning text-dark">Alerte</span>
               {% else %}
