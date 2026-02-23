@@ -74,6 +74,7 @@ class Incident(db.Model):
     cree_par = db.Column(db.Integer, db.ForeignKey('user.id'))
     date_resolution = db.Column(db.DateTime, nullable=True)
     resolu_par_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    image_url = db.Column(db.String(500), nullable=True) # <-- AJOUTÉ ICI
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     hebergement = db.relationship('Hebergement', backref='incidents')
