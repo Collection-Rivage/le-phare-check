@@ -148,6 +148,32 @@ def hebergements():
     h_list = query.paginate(page=page, per_page=30, error_out=False)
     return render_template('hebergements.html', hebergements=h_list, types=get_types(), q=q, statut=statut, type_id=type_id_str)
 
+@app.route('/check/<int:hebergement_id>', methods=['GET', 'POST'])
+@login_required
+def check(hebergement_id):
+    heb = db.session.get(Hebergement, hebergement_id)
+    if not heb:
+        flash('Hébergement introuvable', 'danger')
+        return redirect(url_for('hebergements'))
+    if request.method == 'POST':
+        c = Check(
+            hebergement_id=hebergement_id,
+            user_id=current_user.id,
+            electricite=request.form.get('electricite') == 'on',
+            plomberie=request.form.get('plomberie') == 'on',
+            chauffage=request.form.get('chauffage') == 'on',
+            proprete=request.form.get('proprete') == 'on',
+            equipements=request.form.get('equipements') == 'on',
+            observations=request.form.get('observations'),
+            probleme_critique=request.form.get('probleme_critique') == 'on'
+        )
+        db.session.add(c)
+        heb.statut = 'probleme' if c.probleme_critique else ('ok' if all([c.electricite, c.plomberie, c.chauffage, c.proprete, c.equipements]) else 'alerte')
+        db.session.commit()
+        flash('Contrôle enregistré !', 'success')
+        return redirect(url_for('dashboard'))
+    return render_template('check.html', hebergement=heb)
+
 @app.route('/incident/<int:hebergement_id>', methods=['GET', 'POST'])
 @login_required
 def signaler_incident(hebergement_id):
@@ -228,10 +254,7 @@ def voir_problemes(hebergement_id):
 @app.route('/historique')
 @login_required
 def historique():
-    checks = Check.query.options(
-        joinedload(Check.hebergement),
-        joinedload(Check.technicien)
-    ).order_by(desc(Check.created_at)).limit(50).all()
+    checks = Check.query.options(joinedload(Check.hebergement), joinedload(Check.technicien)).order_by(desc(Check.created_at)).limit(50).all()
     return render_template('historique.html', checks=checks)
 
 @app.route('/types')
@@ -248,6 +271,7 @@ def add_type():
     db.session.commit()
     flash('Type ajouté', 'success')
     return redirect(url_for('types'))
+
 @app.route('/admin/users')
 @login_required
 def admin_users():
