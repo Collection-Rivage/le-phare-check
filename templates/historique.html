@@ -27,7 +27,6 @@
                             <td>
                                 {% if check.probleme_critique %}
                                     <span class="badge bg-danger">CRITIQUE</span>
-                                <!-- MODIFICATION ICI : On utilise "and" au lieu de "all()" -->
                                 {% elif not (check.electricite and check.plomberie and check.chauffage and check.proprete and check.equipements) %}
                                     <span class="badge bg-warning text-dark">ALERTE</span>
                                 {% else %}
@@ -67,6 +66,17 @@
                                                 Équipements : <span>{{ '✅ OK' if check.equipements else '❌ Problème' }}</span>
                                             </li>
                                         </ul>
+
+                                        <!-- AFFICHAGE DE LA PHOTO DANS L'HISTORIQUE SI ELLE EXISTE -->
+                                        {% if check.image_url %}
+                                        <div class="mt-3">
+                                            <h6>📸 Photo :</h6>
+                                            <a href="{{ check.image_url }}" target="_blank">
+                                                <img src="{{ check.image_url }}" class="img-fluid rounded border" alt="Photo contrôle">
+                                            </a>
+                                        </div>
+                                        {% endif %}
+
                                         <div class="mt-3">
                                             <h6>Observations :</h6>
                                             <p class="p-2 bg-light rounded border">{{ check.observations if check.observations else 'Aucune observation.' }}</p>
