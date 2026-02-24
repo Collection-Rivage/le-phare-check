@@ -34,60 +34,12 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <button class="btn btn-info btn-sm text-white" data-bs-toggle="modal" data-bs-target="#detailsModal{{ check.id }}">
+                                <!-- Bouton pour ouvrir la modale -->
+                                <button type="button" class="btn btn-info btn-sm text-white" data-bs-toggle="modal" data-bs-target="#modal{{ check.id }}">
                                     <i class="bi bi-eye"></i> Détails
                                 </button>
                             </td>
                         </tr>
-
-                        <!-- Fenêtre Modale Unique pour ce check -->
-                        <div class="modal fade" id="detailsModal{{ check.id }}" tabindex="-1" aria-hidden="true">
-                            <div class="modal-dialog">
-                                <div class="modal-content">
-                                    <div class="modal-header">
-                                        <h5 class="modal-title">Détails du contrôle - {{ check.hebergement.emplacement }}</h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                    </div>
-                                    <div class="modal-body">
-                                        <ul class="list-group list-group-flush">
-                                            <li class="list-group-item d-flex justify-content-between">
-                                                Électricité : <span>{{ '✅ OK' if check.electricite else '❌ Problème' }}</span>
-                                            </li>
-                                            <li class="list-group-item d-flex justify-content-between">
-                                                Plomberie : <span>{{ '✅ OK' if check.plomberie else '❌ Problème' }}</span>
-                                            </li>
-                                            <li class="list-group-item d-flex justify-content-between">
-                                                Chauffage : <span>{{ '✅ OK' if check.chauffage else '❌ Problème' }}</span>
-                                            </li>
-                                            <li class="list-group-item d-flex justify-content-between">
-                                                Propreté : <span>{{ '✅ OK' if check.proprete else '❌ Problème' }}</span>
-                                            </li>
-                                            <li class="list-group-item d-flex justify-content-between">
-                                                Équipements : <span>{{ '✅ OK' if check.equipements else '❌ Problème' }}</span>
-                                            </li>
-                                        </ul>
-
-                                        <!-- AFFICHAGE DE LA PHOTO DANS L'HISTORIQUE SI ELLE EXISTE -->
-                                        {% if check.image_url %}
-                                        <div class="mt-3">
-                                            <h6>📸 Photo :</h6>
-                                            <a href="{{ check.image_url }}" target="_blank">
-                                                <img src="{{ check.image_url }}" class="img-fluid rounded border" alt="Photo contrôle">
-                                            </a>
-                                        </div>
-                                        {% endif %}
-
-                                        <div class="mt-3">
-                                            <h6>Observations :</h6>
-                                            <p class="p-2 bg-light rounded border">{{ check.observations if check.observations else 'Aucune observation.' }}</p>
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -95,4 +47,52 @@
         </div>
     </div>
 </div>
+
+<!-- SECTION DES MODALES (Placées en dehors de la table pour éviter les bugs de clic) -->
+{% for check in checks %}
+<div class="modal fade" id="modal{{ check.id }}" tabindex="-1" aria-labelledby="label{{ check.id }}" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title" id="label{{ check.id }}">
+                    Détails : {{ check.hebergement.emplacement if check.hebergement else 'N/A' }}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-3">Contrôle effectué le {{ check.created_at.strftime('%d/%m/%Y à %H:%M') }}</p>
+                
+                <ul class="list-group list-group-flush border-bottom">
+                    <li class="list-group-item d-flex justify-content-between">
+                        Électricité : <span>{{ '✅ OK' if check.electricite else '❌ Problème' }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        Plomberie : <span>{{ '✅ OK' if check.plomberie else '❌ Problème' }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        Chauffage : <span>{{ '✅ OK' if check.chauffage else '❌ Problème' }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        Propreté : <span>{{ '✅ OK' if check.proprete else '❌ Problème' }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        Équipements : <span>{{ '✅ OK' if check.equipements else '❌ Problème' }}</span>
+                    </li>
+                </ul>
+
+                {% if check.observations %}
+                <div class="mt-3">
+                    <h6 class="fw-bold">Observations :</h6>
+                    <div class="p-2 bg-light rounded border">{{ check.observations }}</div>
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
 {% endblock %}
