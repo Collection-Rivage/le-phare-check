@@ -304,6 +304,27 @@ def add_user():
     flash(f'Utilisateur {u.username} créé !', 'success')
     return redirect(url_for('admin_users'))
 
+@app.route('/admin/users/edit/<int:id>', methods=['POST'])
+@login_required
+def edit_user(id):
+    if current_user.role != 'admin': return redirect(url_for('dashboard'))
+    u = db.session.get(User, id)
+    if not u: return redirect(url_for('admin_users'))
+    
+    # Mise à jour du rôle
+    u.role = request.form.get('role')
+    
+    # Mise à jour du mot de passe si rempli
+    new_password = request.form.get('password')
+    if new_password:
+        u.set_password(new_password)
+        u.must_change_password = True
+        flash(f'Mot de passe de {u.username} réinitialisé', 'success')
+    
+    db.session.commit()
+    flash('Utilisateur mis à jour', 'success')
+    return redirect(url_for('admin_users'))
+
 @app.route('/admin/users/delete/<int:id>')
 @login_required
 def delete_user(id):
