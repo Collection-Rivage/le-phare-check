@@ -205,16 +205,34 @@ def delete_hebergement(id):
 def check(hebergement_id):
     heb = db.session.get(Hebergement, hebergement_id)
     if not heb: return redirect(url_for('hebergements'))
+    
     if request.method == 'POST':
-        c = Check(hebergement_id=hebergement_id, user_id=current_user.id, 
-                  electricite=request.form.get('electricite') == 'on', plomberie=request.form.get('plomberie') == 'on',
-                  chauffage=request.form.get('chauffage') == 'on', proprete=request.form.get('proprete') == 'on',
-                  equipements=request.form.get('equipements') == 'on', observations=request.form.get('observations'),
-                  probleme_critique=request.form.get('probleme_critique') == 'on')
+        # --- RÉCUPÉRATION DE LA SIGNATURE ---
+        signature_data = request.form.get('signature_data')
+        url_signature = None
+        if signature_data:
+            try:
+                # Upload direct de la chaîne Base64 vers Cloudinary
+                upload_result = cloudinary.uploader.upload(signature_data, folder="signatures")
+                url_signature = upload_result.get('secure_url')
+            except Exception as e:
+                print(f"❌ Erreur Upload Signature : {e}")
+
+        c = Check(
+            hebergement_id=hebergement_id,
+            user_id=current_user.id,
+            electricite=request.form.get('electricite') == 'on',
+            plomberie=request.form.get('plomberie') == 'on',
+            chauffage=request.form.get('chauffage') == 'on',
+            proprete=request.form.get('proprete') == 'on',
+            equipements=request.form.get('equipements') == 'on',
+            observations=request.form.get('observations'),
+            probleme_critique=request.form.get('probleme_critique') == 'on',
+            signature_url=url_signature # <-- ON ENREGISTRE L'URL ICI
+        )
         db.session.add(c)
-        heb.statut = 'probleme' if c.probleme_critique else ('ok' if all([c.electricite, c.plomberie, c.chauffage, c.proprete, c.equipements]) else 'alerte')
+        # ... reste de la logique de statut ...
         db.session.commit()
-        flash('Contrôle enregistré !', 'success')
         return redirect(url_for('dashboard'))
     return render_template('check.html', hebergement=heb)
 
