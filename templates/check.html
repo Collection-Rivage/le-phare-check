@@ -1,88 +1,79 @@
 {% extends "base.html" %}
-
-{% block title %}Check - {{ hebergement.emplacement }}{% endblock %}
-
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header bg-primary text-white">
-                <h4 class="mb-0">
-                    <i class="bi bi-clipboard-check"></i> Check : {{ hebergement.emplacement }}
-                </h4>
-                <small>{{ hebergement.type_hebergement.nom }} - {{ hebergement.nb_personnes or 'N/A' }} pers. - Châssis: {{ hebergement.numero_chassis or 'N/A' }}</small>
-            </div>
-            
+<div class="container mt-4">
+    <h2>Contrôle : {{ hebergement.emplacement }}</h2>
+    
+    <form method="POST" id="checkForm" enctype="multipart/form-data">
+        <!-- Tes champs actuels (Électricité, Plomberie, etc.) -->
+        <div class="card mb-4">
             <div class="card-body">
-                <form method="POST">
-                    <h5 class="mb-3">Checklist technique</h5>
-                    
-                    <div class="form-check form-switch mb-3">
-                        <input class="form-check-input" type="checkbox" id="electricite" name="electricite" checked>
-                        <label class="form-check-label" for="electricite">
-                            <i class="bi bi-lightning-charge"></i> Électricité
-                        </label>
-                    </div>
-                    
-                    <div class="form-check form-switch mb-3">
-                        <input class="form-check-input" type="checkbox" id="plomberie" name="plomberie" checked>
-                        <label class="form-check-label" for="plomberie">
-                            <i class="bi bi-droplet"></i> Plomberie
-                        </label>
-                    </div>
-                    
-                    <div class="form-check form-switch mb-3">
-                        <input class="form-check-input" type="checkbox" id="chauffage" name="chauffage" checked>
-                        <label class="form-check-label" for="chauffage">
-                            <i class="bi bi-thermometer-half"></i> Chauffage
-                        </label>
-                    </div>
-                    
-                    <div class="form-check form-switch mb-3">
-                        <input class="form-check-input" type="checkbox" id="proprete" name="proprete" checked>
-                        <label class="form-check-label" for="proprete">
-                            <i class="bi bi-spray-can"></i> Propreté
-                        </label>
-                    </div>
-                    
-                    <div class="form-check form-switch mb-3">
-                        <input class="form-check-input" type="checkbox" id="equipements" name="equipements" checked>
-                        <label class="form-check-label" for="equipements">
-                            <i class="bi bi-tools"></i> Équipements
-                        </label>
-                    </div>
-                    
-                    <hr>
-                    
-                    {% if hebergement.compteur_eau %}
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle"></i> <strong>Compteur d'eau :</strong> {{ hebergement.compteur_eau.replace('_', ' ').title() }}
-                    </div>
-                    {% endif %}
-                    
-                    <div class="mb-3">
-                        <label for="observations" class="form-label">Observations</label>
-                        <textarea class="form-control" id="observations" name="observations" rows="4" placeholder="Notez ici vos observations..."></textarea>
-                    </div>
-                    
-                    <div class="form-check mb-4">
-                        <input class="form-check-input" type="checkbox" id="probleme_critique" name="probleme_critique">
-                        <label class="form-check-label text-danger fw-bold" for="probleme_critique">
-                            <i class="bi bi-exclamation-triangle-fill"></i> Problème critique nécessitant une intervention immédiate
-                        </label>
-                    </div>
-                    
-                    <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-success btn-lg">
-                            <i class="bi bi-check-circle"></i> Valider le check
-                        </button>
-                        <a href="{{ url_for('hebergements') }}" class="btn btn-secondary">
-                            <i class="bi bi-x-circle"></i> Annuler
-                        </a>
-                    </div>
-                </form>
+                {% for field in ['electricite', 'plomberie', 'chauffage', 'proprete', 'equipements'] %}
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" name="{{ field }}" id="{{ field }}" checked>
+                    <label class="form-check-label" for="{{ field }}">{{ field|capitalize }} OK ?</label>
+                </div>
+                {% endfor %}
+                
+                <div class="mb-3">
+                    <label class="form-label">Observations :</label>
+                    <textarea class="form-control" name="observations" rows="3"></textarea>
+                </div>
+
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" name="probleme_critique" id="probleme_critique">
+                    <label class="form-check-label text-danger fw-bold" for="probleme_critique">🚨 PROBLÈME CRITIQUE</label>
+                </div>
             </div>
         </div>
-    </div>
+
+        <!-- ZONE DE SIGNATURE -->
+        <div class="card mb-4 border-primary">
+            <div class="card-header bg-primary text-white">✍️ Signature du technicien</div>
+            <div class="card-body text-center">
+                <canvas id="signature-pad" class="border rounded bg-light" style="width: 100%; height: 200px; touch-action: none;"></canvas>
+                <div class="mt-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="clear-signature">Effacer</button>
+                </div>
+                <input type="hidden" name="signature_data" id="signature_data">
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-success btn-lg w-100">Envoyer le rapport</button>
+    </form>
 </div>
+
+<!-- Script pour gérer le tracé de la signature -->
+<script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
+<script>
+    const canvas = document.querySelector("canvas");
+    const signaturePad = new SignaturePad(canvas);
+    const form = document.getElementById("checkForm");
+
+    // Redimensionner le canvas proprement
+    function resizeCanvas() {
+        const ratio = Math.max(window.devicePixelRatio || 1, 1);
+        canvas.width = canvas.offsetWidth * ratio;
+        canvas.height = canvas.offsetHeight * ratio;
+        canvas.getContext("2d").scale(ratio, ratio);
+        signaturePad.clear();
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    // Effacer
+    document.getElementById('clear-signature').addEventListener('click', () => {
+        signaturePad.clear();
+    });
+
+    // Avant d'envoyer, on met l'image de la signature dans le champ caché
+    form.addEventListener('submit', (e) => {
+        if (signaturePad.isEmpty()) {
+            alert("Merci de signer avant d'envoyer le rapport.");
+            e.preventDefault();
+        } else {
+            const dataUrl = signaturePad.toDataURL();
+            document.getElementById('signature_data').value = dataUrl;
+        }
+    });
+</script>
 {% endblock %}
