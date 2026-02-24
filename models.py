@@ -60,6 +60,7 @@ class Check(db.Model):
     probleme_critique = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     image_url = db.Column(db.String(500), nullable=True)
+     signature_url = db.Column(db.String(500), nullable=True)
     
     hebergement = db.relationship('Hebergement', backref='checks')
     technicien = db.relationship('User', backref='checks')
