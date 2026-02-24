@@ -35,12 +35,10 @@ class Hebergement(db.Model):
 class TypeHebergement(db.Model):
     __tablename__ = 'type_hebergement'
     id = db.Column(db.Integer, primary_key=True)
-    # 🔥 SUPPRESSION DE unique=True pour permettre les doublons de nom
     nom = db.Column(db.String(50), nullable=False)
     description = db.Column(db.Text)
     hebergements = db.relationship('Hebergement', backref='type_hebergement', lazy=True)
     
-    # Pour afficher proprement dans les listes (nom + description)
     def __repr__(self):
         if self.description:
             return f"{self.nom} ({self.description})"
@@ -58,9 +56,8 @@ class Check(db.Model):
     equipements = db.Column(db.Boolean, default=True)
     observations = db.Column(db.Text)
     probleme_critique = db.Column(db.Boolean, default=False)
+    signature_url = db.Column(db.String(500), nullable=True) # <-- Vérifie cet alignement
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    image_url = db.Column(db.String(500), nullable=True)
-     signature_url = db.Column(db.String(500), nullable=True)
     
     hebergement = db.relationship('Hebergement', backref='checks')
     technicien = db.relationship('User', backref='checks')
@@ -76,7 +73,7 @@ class Incident(db.Model):
     cree_par = db.Column(db.Integer, db.ForeignKey('user.id'))
     date_resolution = db.Column(db.DateTime, nullable=True)
     resolu_par_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
-    image_url = db.Column(db.String(500), nullable=True) # <-- AJOUTÉ ICI
+    image_url = db.Column(db.String(500), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     hebergement = db.relationship('Hebergement', backref='incidents')
