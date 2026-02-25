@@ -29,6 +29,7 @@ class Hebergement(db.Model):
     numero_chassis = db.Column(db.String(100))
     nb_personnes = db.Column(db.Integer)
     compteur_eau = db.Column(db.String(50))
+    emplacement_tableau_elec = db.Column(db.String(100))
     statut = db.Column(db.String(20), default='ok')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
