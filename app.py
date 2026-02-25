@@ -215,7 +215,7 @@ def hebergements():
 @login_required
 def add_hebergement():
     if current_user.role != 'admin': return redirect(url_for('hebergements'))
-    h = Hebergement(emplacement=request.form.get('emplacement'), type_id=request.form.get('type_id'), numero_chassis=request.form.get('numero_chassis'), nb_personnes=request.form.get('nb_personnes'), compteur_eau=request.form.get('compteur_eau'))
+    h = Hebergement(emplacement=request.form.get('emplacement'), type_id=request.form.get('type_id'), numero_chassis=request.form.get('numero_chassis'), nb_personnes=request.form.get('nb_personnes'), compteur_eau=request.form.get('compteur_eau'), emplacement_tableau_elec=request.form.get('emplacement_tableau_elec'))
     db.session.add(h)
     db.session.commit()
     flash('Ajouté', 'success')
@@ -232,6 +232,7 @@ def edit_hebergement(id):
     h.numero_chassis = request.form.get('numero_chassis')
     h.nb_personnes = request.form.get('nb_personnes')
     h.compteur_eau = request.form.get('compteur_eau')
+    h.emplacement_tableau_elec = request.form.get('emplacement_tableau_elec')
     db.session.commit()
     flash('Modifié', 'success')
     return redirect(url_for('hebergements'))
