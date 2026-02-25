@@ -3,87 +3,100 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h2 class="mb-4"><i class="bi bi-clock-history"></i> Historique des contrôles</h2>
-
-    <!-- BARRE DE RECHERCHE ET FILTRES -->
-    <div class="card mb-4 shadow-sm border-primary">
-        <div class="card-body bg-light">
-            <form method="GET" action="{{ url_for('historique') }}" class="row g-2">
-                <!-- Recherche par mot-clé -->
-                <div class="col-md-4">
-                    <label class="form-label small fw-bold">Rechercher dans les notes</label>
-                    <div class="input-group">
-                        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
-                        <input type="text" name="q" class="form-control" placeholder="Ex: fuite, ampoule, vitre..." value="{{ request.args.get('q', '') }}">
-                    </div>
-                </div>
-
-                <!-- Filtre État -->
-                <div class="col-md-2">
-                    <label class="form-label small fw-bold">État</label>
-                    <select name="etat" class="form-select">
-                        <option value="">Tous</option>
-                        <option value="critique" {% if request.args.get('etat') == 'critique' %}selected{% endif %}>🔴 Critique</option>
-                        <option value="alerte" {% if request.args.get('etat') == 'alerte' %}selected{% endif %}>⚠️ Alerte</option>
-                    </select>
-                </div>
-
-                <!-- Filtre Type -->
-                <div class="col-md-2">
-                    <label class="form-label small fw-bold">Type de défaut</label>
-                    <select name="type" class="form-select">
-                        <option value="">Tous les types</option>
-                        <option value="electricite" {% if request.args.get('type') == 'electricite' %}selected{% endif %}>⚡ Électricité</option>
-                        <option value="plomberie" {% if request.args.get('type') == 'plomberie' %}selected{% endif %}>🚰 Plomberie</option>
-                        <option value="chauffage" {% if request.args.get('type') == 'chauffage' %}selected{% endif %}>🔥 Chauffage</option>
-                        <option value="proprete" {% if request.args.get('type') == 'proprete' %}selected{% endif %}>🧹 Propreté</option>
-                        <option value="equipements" {% if request.args.get('type') == 'equipements' %}selected{% endif %}>📺 Équipements</option>
-                    </select>
-                </div>
-
-                <!-- Filtre Technicien -->
-                <div class="col-md-2">
-                    <label class="form-label small fw-bold">Technicien</label>
-                    <select name="tech" class="form-select">
-                        <option value="">Tous</option>
-                        {% for t in techniciens %}
-                        <option value="{{ t.id }}" {% if request.args.get('tech') == t.id|string %}selected{% endif %}>{{ t.username }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <!-- Boutons Actions -->
-                <div class="col-md-2 d-flex align-items-end">
-                    <div class="btn-group w-100">
-                        <button type="submit" class="btn btn-primary fw-bold">Filtrer</button>
-                        <a href="{{ url_for('historique') }}" class="btn btn-outline-secondary" title="Réinitialiser">
-                            <i class="bi bi-arrow-counterclockwise"></i>
-                        </a>
-                    </div>
-                </div>
-            </form>
+    <!-- TITRE AVEC BOUTON DE RECHERCHE -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0 text-primary"><i class="bi bi-clock-history"></i> Historique</h2>
+        
+        <div class="d-flex gap-2">
+            <!-- BOUTON RECHERCHE AVANCÉE (Actionne le menu caché) -->
+            <button class="btn btn-outline-primary fw-bold shadow-sm" type="button" data-bs-toggle="collapse" data-bs-target="#searchCollapse" aria-expanded="false">
+                <i class="bi bi-filter-right"></i> Filtres Avancés
+            </button>
+            <a href="{{ url_for('historique') }}" class="btn btn-light border shadow-sm" title="Réinitialiser">
+                <i class="bi bi-arrow-counterclockwise"></i>
+            </a>
         </div>
     </div>
 
-    <!-- TABLEAU DES RESULTATS -->
-    <div class="card shadow">
+    <!-- ZONE DE RECHERCHE CACHÉE (S'ouvre au clic) -->
+    <div class="collapse {% if request.args.get('q') or request.args.get('etat') or request.args.get('type') or request.args.get('tech') %}show{% endif %} mb-4" id="searchCollapse">
+        <div class="card shadow-sm border-primary" style="background-color: #f8faff;">
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('historique') }}" class="row g-3">
+                    
+                    <!-- Recherche par texte -->
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold small">Mots-clés (notes)</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                            <input type="text" name="q" class="form-control" placeholder="Ex: fuite, vitre..." value="{{ request.args.get('q', '') }}">
+                        </div>
+                    </div>
+
+                    <!-- Filtre État -->
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold small">État Global</label>
+                        <select name="etat" class="form-select border-info">
+                            <option value="">Tous les états</option>
+                            <option value="critique" {% if request.args.get('etat') == 'critique' %}selected{% endif %}>🔴 Critique</option>
+                            <option value="alerte" {% if request.args.get('etat') == 'alerte' %}selected{% endif %}>⚠️ Alerte</option>
+                        </select>
+                    </div>
+
+                    <!-- Filtre Type -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold small">Type de défaut</label>
+                        <select name="type" class="form-select border-info">
+                            <option value="">Toutes les catégories</option>
+                            <option value="electricite" {% if request.args.get('type') == 'electricite' %}selected{% endif %}>⚡ Électricité</option>
+                            <option value="plomberie" {% if request.args.get('type') == 'plomberie' %}selected{% endif %}>🚰 Plomberie</option>
+                            <option value="chauffage" {% if request.args.get('type') == 'chauffage' %}selected{% endif %}>🔥 Chauffage</option>
+                            <option value="proprete" {% if request.args.get('type') == 'proprete' %}selected{% endif %}>🧹 Propreté</option>
+                            <option value="equipements" {% if request.args.get('type') == 'equipements' %}selected{% endif %}>📺 Équipements</option>
+                        </select>
+                    </div>
+
+                    <!-- Filtre Technicien -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold small">Technicien</label>
+                        <select name="tech" class="form-select border-info">
+                            <option value="">Tout le personnel</option>
+                            {% for t in techniciens %}
+                            <option value="{{ t.id }}" {% if request.args.get('tech') == t.id|string %}selected{% endif %}>{{ t.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Bouton de validation -->
+                    <div class="col-12 text-end mt-3">
+                        <button type="submit" class="btn btn-primary px-5 shadow-sm fw-bold">
+                            Appliquer les filtres
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- TABLEAU DES RÉSULTATS -->
+    <div class="card shadow-sm border-0">
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>Date</th>
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr class="text-uppercase small">
+                            <th class="ps-3">Date</th>
                             <th>Hébergement</th>
                             <th>Technicien</th>
-                            <th>État Global</th>
-                            <th class="text-end">Actions</th>
+                            <th>Statut</th>
+                            <th class="text-end pe-3">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for check in checks %}
                         <tr>
-                            <td>{{ check.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
-                            <td><strong>{{ check.hebergement.emplacement if check.hebergement else 'N/A' }}</strong></td>
+                            <td class="ps-3 small text-muted">{{ check.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td><span class="badge bg-light text-dark border">{{ check.hebergement.emplacement if check.hebergement else 'N/A' }}</span></td>
                             <td>{{ check.technicien.username if check.technicien else 'Anonyme' }}</td>
                             <td>
                                 {% if check.probleme_critique %}
@@ -94,9 +107,9 @@
                                     <span class="badge bg-success">OK</span>
                                 {% endif %}
                             </td>
-                            <td class="text-end">
-                                <button type="button" class="btn btn-info btn-sm text-white" data-bs-toggle="modal" data-bs-target="#modal{{ check.id }}">
-                                    <i class="bi bi-eye"></i> Détails
+                            <td class="text-end pe-3">
+                                <button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#modal{{ check.id }}">
+                                    Voir Détails
                                 </button>
                             </td>
                         </tr>
@@ -107,66 +120,50 @@
             {% if not checks %}
             <div class="p-5 text-center text-muted">
                 <i class="bi bi-search fs-1"></i>
-                <p class="mt-2">Aucun résultat ne correspond à votre recherche.</p>
+                <p class="mt-2">Aucun résultat trouvé pour votre recherche.</p>
             </div>
             {% endif %}
         </div>
     </div>
 </div>
 
-<!-- SECTION DES MODALES (Placées en dehors de la table pour éviter les bugs) -->
+<!-- SECTION DES MODALES -->
 {% for check in checks %}
 <div class="modal fade" id="modal{{ check.id }}" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header bg-light">
-                <h5 class="modal-title">
-                    Détails : {{ check.hebergement.emplacement if check.hebergement else 'N/A' }}
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-file-earmark-text"></i> Rapport : {{ check.hebergement.emplacement }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p class="text-muted small mb-3">Contrôle effectué par <strong>{{ check.technicien.username }}</strong> le {{ check.created_at.strftime('%d/%m/%Y à %H:%M') }}</p>
-                
-                <ul class="list-group list-group-flush border-bottom">
-                    <li class="list-group-item d-flex justify-content-between">
-                        Électricité : <span>{{ '✅ OK' if check.electricite else '❌ Problème' }}</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between">
-                        Plomberie : <span>{{ '✅ OK' if check.plomberie else '❌ Problème' }}</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between">
-                        Chauffage : <span>{{ '✅ OK' if check.chauffage else '❌ Problème' }}</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between">
-                        Propreté : <span>{{ '✅ OK' if check.proprete else '❌ Problème' }}</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between">
-                        Équipements : <span>{{ '✅ OK' if check.equipements else '❌ Problème' }}</span>
-                    </li>
+                <ul class="list-group list-group-flush border-bottom mb-3">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">Électricité <span>{{ '✅ OK' if check.electricite else '❌ Problème' }}</span></li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">Plomberie <span>{{ '✅ OK' if check.plomberie else '❌ Problème' }}</span></li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">Chauffage <span>{{ '✅ OK' if check.chauffage else '❌ Problème' }}</span></li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">Propreté <span>{{ '✅ OK' if check.proprete else '❌ Problème' }}</span></li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">Équipements <span>{{ '✅ OK' if check.equipements else '❌ Problème' }}</span></li>
                 </ul>
 
                 {% if check.observations %}
                 <div class="mt-3">
-                    <h6 class="fw-bold">Observations :</h6>
-                    <div class="p-2 bg-light rounded border small">{{ check.observations }}</div>
+                    <h6 class="fw-bold small text-muted text-uppercase">Observations :</h6>
+                    <div class="p-3 bg-light rounded border">{{ check.observations }}</div>
                 </div>
                 {% endif %}
 
-                <!-- AFFICHAGE DE LA SIGNATURE -->
                 {% if check.signature_url %}
-                <div class="mt-3 text-center border-top pt-3">
-                    <h6 class="fw-bold text-start">Signature :</h6>
-                    <img src="{{ check.signature_url }}" class="img-fluid bg-white border rounded" style="max-height: 100px;" alt="Signature">
+                <div class="mt-4 text-center border-top pt-3">
+                    <h6 class="fw-bold text-start small text-muted text-uppercase">Signature :</h6>
+                    <img src="{{ check.signature_url }}" class="img-fluid bg-white border rounded p-2 mt-2" style="max-height: 120px;" alt="Signature">
                 </div>
                 {% endif %}
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary w-100" data-bs-dismiss="modal">Fermer</button>
+                <button type="button" class="btn btn-outline-secondary w-100" data-bs-dismiss="modal">Fermer</button>
             </div>
         </div>
     </div>
 </div>
 {% endfor %}
-
 {% endblock %}
