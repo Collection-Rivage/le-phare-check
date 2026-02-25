@@ -306,6 +306,11 @@
               <label class="form-label">Compteur eau</label>
               <input class="form-control" name="compteur_eau" placeholder="devant_droite">
             </div>
+            <div class="mb-3">
+            <label class="form-label">Emplacement tableau élec extérieur</label>
+            <input type="text" name="emplacement_tableau_elec" class="form-control" 
+             value="{{ h.emplacement_tableau_elec if h else '' }}" placeholder="Ex: Emplacement">
+          </div>
           </div>
         </div>
 
@@ -356,6 +361,11 @@
               <label class="form-label">Compteur eau</label>
               <input class="form-control" name="compteur_eau" value="{{ heb.compteur_eau or '' }}">
             </div>
+            <div class="mb-3">
+            <label class="form-label">Emplacement tableau élec extérieur</label>
+            <input type="text" name="emplacement_tableau_elec" class="form-control" 
+           value="{{ h.emplacement_tableau_elec if h else '' }}" placeholder="Ex: Emplacement">
+</div>
           </div>
         </div>
 
