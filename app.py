@@ -136,52 +136,57 @@ def dashboard():
 @app.route('/historique')
 @login_required
 def historique():
-    # 1. Récupération de tous les paramètres de recherche
+    # 1. Paramètres
     search_q = request.args.get('q', '').strip()
     filter_etat = request.args.get('etat', '')
-    filter_type = request.args.get('type', '')
+    filter_type = request.args.get('type', '') # Pour les incidents, on filtrera par type_incident
     filter_tech = request.args.get('tech', '')
+    source = request.args.get('source', 'checks') # 'checks' ou 'incidents'
 
-    # 2. Construction de la requête de base
-    query = Check.query.options(
-        joinedload(Check.hebergement),
-        joinedload(Check.technicien)
-    )
-
-    # 3. Application des filtres combinés
-    # Filtre par mot-clé dans les observations
-    if search_q:
-        query = query.filter(Check.observations.ilike(f'%{search_q}%'))
-
-    # Filtre par état global
-    if filter_etat == 'critique':
-        query = query.filter(Check.probleme_critique == True)
-    elif filter_etat == 'alerte':
-        query = query.filter(Check.probleme_critique == False, 
-                             or_(Check.electricite==False, Check.plomberie==False, 
-                                 Check.chauffage==False, Check.proprete==False, Check.equipements==False))
-
-    # Filtre par type de défaut spécifique
-    if filter_type:
-        if filter_type == 'electricite': query = query.filter(Check.electricite == False)
-        elif filter_type == 'plomberie': query = query.filter(Check.plomberie == False)
-        elif filter_type == 'chauffage': query = query.filter(Check.chauffage == False)
-        elif filter_type == 'proprete': query = query.filter(Check.proprete == False)
-        elif filter_type == 'equipements': query = query.filter(Check.equipements == False)
-
-    # Filtre par technicien
-    if filter_tech:
-        try:
-            query = query.filter(Check.user_id == int(filter_tech))
-        except ValueError: pass
-
-    # 4. Exécution de la requête (trié par date décroissante)
-    checks = query.order_by(desc(Check.created_at)).limit(100).all()
-    
-    # Liste des techniciens pour le menu déroulant
     techniciens = User.query.filter(User.role.in_(['technicien', 'admin'])).all()
-    
-    return render_template('historique.html', checks=checks, techniciens=techniciens)
+
+    if source == 'incidents':
+        # --- RECHERCHE DANS LES INCIDENTS ---
+        query = Incident.query.options(joinedload(Incident.hebergement), joinedload(Incident.technicien))
+        
+        if search_q:
+            query = query.filter(Incident.description.ilike(f'%{search_q}%'))
+        
+        if filter_etat:
+            query = query.filter(Incident.statut == filter_etat)
+            
+        if filter_type: # Ici filter_type correspond à 'urgence' ou 'probleme'
+            query = query.filter(Incident.type_incident == filter_type)
+            
+        if filter_tech:
+            query = query.filter(Incident.assigne_a == int(filter_tech))
+            
+        results = query.order_by(desc(Incident.created_at)).all()
+        return render_template('historique.html', results=results, techniciens=techniciens, source=source)
+
+    else:
+        # --- RECHERCHE DANS LES CHECKS (Ta logique actuelle) ---
+        query = Check.query.options(joinedload(Check.hebergement), joinedload(Check.technicien))
+        
+        if search_q:
+            query = query.filter(Check.observations.ilike(f'%{search_q}%'))
+            
+        if filter_etat == 'critique':
+            query = query.filter(Check.probleme_critique == True)
+        elif filter_etat == 'alerte':
+            query = query.filter(Check.probleme_critique == False, 
+                                 or_(Check.electricite==False, Check.plomberie==False, 
+                                     Check.chauffage==False, Check.proprete==False, Check.equipements==False))
+        
+        if filter_type:
+            col = getattr(Check, filter_type, None)
+            if col: query = query.filter(col == False)
+
+        if filter_tech:
+            query = query.filter(Check.user_id == int(filter_tech))
+
+        results = query.order_by(desc(Check.created_at)).limit(100).all()
+        return render_template('historique.html', results=results, techniciens=techniciens, source=source)
 
 # ===================== HEBERGEMENTS =====================
 
