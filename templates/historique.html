@@ -5,17 +5,78 @@
 <div class="container mt-4">
     <h2 class="mb-4"><i class="bi bi-clock-history"></i> Historique des contrôles</h2>
 
+    <!-- BARRE DE RECHERCHE ET FILTRES -->
+    <div class="card mb-4 shadow-sm border-primary">
+        <div class="card-body bg-light">
+            <form method="GET" action="{{ url_for('historique') }}" class="row g-2">
+                <!-- Recherche par mot-clé -->
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold">Rechercher dans les notes</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                        <input type="text" name="q" class="form-control" placeholder="Ex: fuite, ampoule, vitre..." value="{{ request.args.get('q', '') }}">
+                    </div>
+                </div>
+
+                <!-- Filtre État -->
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold">État</label>
+                    <select name="etat" class="form-select">
+                        <option value="">Tous</option>
+                        <option value="critique" {% if request.args.get('etat') == 'critique' %}selected{% endif %}>🔴 Critique</option>
+                        <option value="alerte" {% if request.args.get('etat') == 'alerte' %}selected{% endif %}>⚠️ Alerte</option>
+                    </select>
+                </div>
+
+                <!-- Filtre Type -->
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold">Type de défaut</label>
+                    <select name="type" class="form-select">
+                        <option value="">Tous les types</option>
+                        <option value="electricite" {% if request.args.get('type') == 'electricite' %}selected{% endif %}>⚡ Électricité</option>
+                        <option value="plomberie" {% if request.args.get('type') == 'plomberie' %}selected{% endif %}>🚰 Plomberie</option>
+                        <option value="chauffage" {% if request.args.get('type') == 'chauffage' %}selected{% endif %}>🔥 Chauffage</option>
+                        <option value="proprete" {% if request.args.get('type') == 'proprete' %}selected{% endif %}>🧹 Propreté</option>
+                        <option value="equipements" {% if request.args.get('type') == 'equipements' %}selected{% endif %}>📺 Équipements</option>
+                    </select>
+                </div>
+
+                <!-- Filtre Technicien -->
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold">Technicien</label>
+                    <select name="tech" class="form-select">
+                        <option value="">Tous</option>
+                        {% for t in techniciens %}
+                        <option value="{{ t.id }}" {% if request.args.get('tech') == t.id|string %}selected{% endif %}>{{ t.username }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Boutons Actions -->
+                <div class="col-md-2 d-flex align-items-end">
+                    <div class="btn-group w-100">
+                        <button type="submit" class="btn btn-primary fw-bold">Filtrer</button>
+                        <a href="{{ url_for('historique') }}" class="btn btn-outline-secondary" title="Réinitialiser">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- TABLEAU DES RESULTATS -->
     <div class="card shadow">
-        <div class="card-body">
+        <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover">
+                <table class="table table-hover mb-0">
                     <thead class="table-dark">
                         <tr>
                             <th>Date</th>
                             <th>Hébergement</th>
                             <th>Technicien</th>
                             <th>État Global</th>
-                            <th>Actions</th>
+                            <th class="text-end">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -33,8 +94,7 @@
                                     <span class="badge bg-success">OK</span>
                                 {% endif %}
                             </td>
-                            <td>
-                                <!-- Bouton pour ouvrir la modale -->
+                            <td class="text-end">
                                 <button type="button" class="btn btn-info btn-sm text-white" data-bs-toggle="modal" data-bs-target="#modal{{ check.id }}">
                                     <i class="bi bi-eye"></i> Détails
                                 </button>
@@ -44,23 +104,29 @@
                     </tbody>
                 </table>
             </div>
+            {% if not checks %}
+            <div class="p-5 text-center text-muted">
+                <i class="bi bi-search fs-1"></i>
+                <p class="mt-2">Aucun résultat ne correspond à votre recherche.</p>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
 
-<!-- SECTION DES MODALES (Placées en dehors de la table pour éviter les bugs de clic) -->
+<!-- SECTION DES MODALES (Placées en dehors de la table pour éviter les bugs) -->
 {% for check in checks %}
-<div class="modal fade" id="modal{{ check.id }}" tabindex="-1" aria-labelledby="label{{ check.id }}" aria-hidden="true">
-    <div class="modal-dialog">
+<div class="modal fade" id="modal{{ check.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header bg-light">
-                <h5 class="modal-title" id="label{{ check.id }}">
+                <h5 class="modal-title">
                     Détails : {{ check.hebergement.emplacement if check.hebergement else 'N/A' }}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p class="text-muted small mb-3">Contrôle effectué le {{ check.created_at.strftime('%d/%m/%Y à %H:%M') }}</p>
+                <p class="text-muted small mb-3">Contrôle effectué par <strong>{{ check.technicien.username }}</strong> le {{ check.created_at.strftime('%d/%m/%Y à %H:%M') }}</p>
                 
                 <ul class="list-group list-group-flush border-bottom">
                     <li class="list-group-item d-flex justify-content-between">
@@ -83,12 +149,20 @@
                 {% if check.observations %}
                 <div class="mt-3">
                     <h6 class="fw-bold">Observations :</h6>
-                    <div class="p-2 bg-light rounded border">{{ check.observations }}</div>
+                    <div class="p-2 bg-light rounded border small">{{ check.observations }}</div>
+                </div>
+                {% endif %}
+
+                <!-- AFFICHAGE DE LA SIGNATURE -->
+                {% if check.signature_url %}
+                <div class="mt-3 text-center border-top pt-3">
+                    <h6 class="fw-bold text-start">Signature :</h6>
+                    <img src="{{ check.signature_url }}" class="img-fluid bg-white border rounded" style="max-height: 100px;" alt="Signature">
                 </div>
                 {% endif %}
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                <button type="button" class="btn btn-secondary w-100" data-bs-dismiss="modal">Fermer</button>
             </div>
         </div>
     </div>
